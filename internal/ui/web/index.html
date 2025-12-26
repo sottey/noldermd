@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NolderMD</title>
+  <link rel="stylesheet" href="/vendor/highlight.css" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app" class="app" data-view="split">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">NolderMD</div>
+        <div class="search-row">
+          <input id="search-input" class="search-input" type="text" placeholder="Search notes" />
+          <button id="search-btn" class="ghost">Search</button>
+        </div>
+        <div id="search-results" class="search-results hidden"></div>
+        <button id="refresh-btn" class="ghost">Refresh</button>
+      </div>
+      <div id="tree-container" class="tree"></div>
+    </aside>
+    <div id="sidebar-resizer" class="resizer resizer-vertical" aria-hidden="true"></div>
+    <main class="main">
+      <header class="main-header">
+        <div class="note-info">
+          <div id="note-path" class="note-path">No note selected</div>
+          <button id="save-btn" class="primary" disabled>Save</button>
+        </div>
+        <div class="view-selector" role="group" aria-label="View selector">
+          <button class="view-btn" data-view="edit" title="Edit">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.25V20h2.75L17.81 8.94l-2.75-2.75L4 17.25zm15.71-9.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 2.75 2.75 1.99-1.66z"/></svg>
+          </button>
+          <button class="view-btn" data-view="preview" title="Preview">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
+          </button>
+          <button class="view-btn" data-view="split" title="Split">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h7v14H4V5zm9 0h7v14h-7V5z"/></svg>
+          </button>
+        </div>
+      </header>
+      <section id="main-content" class="main-content">
+        <div id="editor-pane" class="pane">
+          <textarea id="editor" class="editor" spellcheck="false"></textarea>
+        </div>
+        <div id="pane-resizer" class="resizer resizer-vertical" aria-hidden="true"></div>
+        <div id="preview-pane" class="pane">
+          <div id="preview" class="preview"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="context-menu" class="context-menu hidden" role="menu"></div>
+
+  <script src="/vendor/marked.min.js"></script>
+  <script src="/vendor/highlight.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
