@@ -1,0 +1,9 @@
+version: "3.8"
+
+services:
+  noldermd:
+    build: .
+    ports:
+      - "${NOLDERMD_PORT:-8080}:8080"
+    volumes:
+      - "./Notes:/notes"
