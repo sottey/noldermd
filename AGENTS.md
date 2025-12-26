@@ -79,6 +79,7 @@ This file documents the current project shape and interaction model.
 - Tree responses include metadata only, never file contents.
 - If a note path is missing the `.md` extension, it is appended on create.
 - Only `.md` files are considered notes; other files are ignored.
+- Files starting with `._` are ignored.
 - Tags match `#` followed by letters, preceded by whitespace or start of line.
 
 ## Open questions to confirm

@@ -344,6 +344,9 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		if d.IsDir() {
 			return nil
 		}
+		if isIgnoredFile(d.Name()) {
+			return nil
+		}
 		if !isMarkdown(d.Name()) {
 			return nil
 		}
@@ -392,6 +395,9 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		if d.IsDir() {
+			return nil
+		}
+		if isIgnoredFile(d.Name()) {
 			return nil
 		}
 		if !isMarkdown(d.Name()) {
@@ -640,6 +646,10 @@ func (s *Server) buildTree(absPath, relPath string) ([]TreeNode, error) {
 			continue
 		}
 
+		if isIgnoredFile(name) {
+			continue
+		}
+
 		if !isMarkdown(name) {
 			if isImage(name) {
 				nodes = append(nodes, TreeNode{
@@ -738,6 +748,10 @@ func ensureMarkdown(path string) string {
 
 func isMarkdown(name string) bool {
 	return strings.HasSuffix(strings.ToLower(name), ".md")
+}
+
+func isIgnoredFile(name string) bool {
+	return strings.HasPrefix(name, "._")
 }
 
 func isImage(name string) bool {

@@ -31,6 +31,7 @@ Open http://localhost:8080.
 
 - `.md` is appended on note creation when missing.
 - Only `.md` files are treated as notes.
+- Files starting with `._` are ignored.
 - Tree responses return metadata only.
 - Tags match `#` followed by letters, preceded by whitespace or start of line.
 
