@@ -10,6 +10,14 @@ import (
 )
 
 func main() {
+	rootCmd := newRootCmd(server.Run)
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func newRootCmd(runServer func(server.Config) error) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "noldermd",
 		Short: "NolderMD - Markdown notes server",
@@ -34,7 +42,7 @@ func main() {
 			}
 
 			fmt.Printf("NolderMD listening on http://localhost:%d (notes: %s)\n", port, notesDir)
-			return server.Run(cfg)
+			return runServer(cfg)
 		},
 	}
 
@@ -43,8 +51,5 @@ func main() {
 
 	rootCmd.AddCommand(serveCmd)
 
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	return rootCmd
 }

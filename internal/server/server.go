@@ -36,5 +36,7 @@ func Run(cfg Config) error {
 	r.Mount("/", ui.NewRouter())
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
-	return http.ListenAndServe(addr, r)
+	return listenAndServe(addr, r)
 }
+
+var listenAndServe = http.ListenAndServe

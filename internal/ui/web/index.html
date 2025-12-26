@@ -11,13 +11,24 @@
   <div id="app" class="app" data-view="split">
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
-        <div class="brand">NolderMD</div>
+        <div class="sidebar-title">
+          <div class="brand">NolderMD</div>
+          <button id="refresh-btn" class="ghost icon-btn" title="Refresh" aria-label="Refresh">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 6V3l-4 4 4 4V8a4 4 0 1 1-4 4H6a6 6 0 1 0 6-6z"/>
+              <path d="M16 12a4 4 0 0 1-4 4v3l4-4-4-4v3a2 2 0 0 0 2-2h2z"/>
+            </svg>
+          </button>
+        </div>
         <div class="search-row">
           <input id="search-input" class="search-input" type="text" placeholder="Search notes" />
-          <button id="search-btn" class="ghost">Search</button>
+          <button id="search-btn" class="ghost icon-btn" title="Search" aria-label="Search">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.71.71l.27.28v.79l5 5 1.5-1.5-5-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/>
+            </svg>
+          </button>
         </div>
         <div id="search-results" class="search-results hidden"></div>
-        <button id="refresh-btn" class="ghost">Refresh</button>
       </div>
       <div id="tree-container" class="tree"></div>
     </aside>
@@ -40,12 +51,23 @@
           </button>
         </div>
       </header>
+      <div id="tag-bar" class="tag-bar hidden">
+        <button id="tag-add-btn" class="tag-add-btn" title="Add tag" aria-label="Add tag">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M11 5h2v14h-2zM5 11h14v2H5z"/>
+          </svg>
+        </button>
+        <div id="tag-pills" class="tag-pills"></div>
+      </div>
       <section id="main-content" class="main-content">
         <div id="editor-pane" class="pane">
           <textarea id="editor" class="editor" spellcheck="false"></textarea>
         </div>
         <div id="pane-resizer" class="resizer resizer-vertical" aria-hidden="true"></div>
         <div id="preview-pane" class="pane">
+          <div id="asset-preview" class="asset-preview hidden"></div>
+          <div id="pdf-preview" class="pdf-preview hidden"></div>
+          <div id="csv-preview" class="csv-preview hidden"></div>
           <div id="preview" class="preview"></div>
         </div>
       </section>

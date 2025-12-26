@@ -8,6 +8,7 @@ const preview = document.getElementById("preview");
 const notePath = document.getElementById("note-path");
 const saveBtn = document.getElementById("save-btn");
 const viewButtons = Array.from(document.querySelectorAll(".view-btn"));
+const viewSelector = document.querySelector(".view-selector");
 const contextMenu = document.getElementById("context-menu");
 const sidebar = document.getElementById("sidebar");
 const sidebarResizer = document.getElementById("sidebar-resizer");
@@ -15,15 +16,49 @@ const paneResizer = document.getElementById("pane-resizer");
 const editorPane = document.getElementById("editor-pane");
 const previewPane = document.getElementById("preview-pane");
 const mainContent = document.getElementById("main-content");
+const mainHeader = document.querySelector(".main-header");
 const searchInput = document.getElementById("search-input");
 const searchBtn = document.getElementById("search-btn");
 const searchResults = document.getElementById("search-results");
+const tagBar = document.getElementById("tag-bar");
+const tagAddBtn = document.getElementById("tag-add-btn");
+const tagPills = document.getElementById("tag-pills");
+const assetPreview = document.getElementById("asset-preview");
+const pdfPreview = document.getElementById("pdf-preview");
+const csvPreview = document.getElementById("csv-preview");
 
 let currentNotePath = "";
+let currentActivePath = "";
 let currentTree = null;
+let currentTags = [];
 let isDirty = false;
+let syncingScroll = false;
+let activeScrollSource = null;
+let clearScrollSourceTimer = null;
+
+const tagPalette = [
+  "#fde68a",
+  "#fecdd3",
+  "#bfdbfe",
+  "#bbf7d0",
+  "#e9d5ff",
+  "#fbcfe8",
+  "#bae6fd",
+  "#fed7aa",
+  "#c7d2fe",
+  "#a7f3d0",
+  "#f5d0fe",
+  "#d9f99d",
+  "#fecaca",
+  "#cbd5f5",
+  "#e0f2fe",
+  "#fae8ff",
+];
 
 function setView(view) {
+  if (viewSelector.classList.contains("hidden")) {
+    return;
+  }
   app.dataset.view = view;
   viewButtons.forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.view === view);
@@ -40,6 +75,13 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function displayNodeName(node) {
+  if (node.type === "file" && node.name && node.name.toLowerCase().endsWith(".md")) {
+    return node.name.slice(0, -3);
+  }
+  return node.name || "(root)";
 }
 
 function renderMarkdown(text) {
@@ -70,6 +112,74 @@ function renderMarkdown(text) {
   });
 
   return marked.parse(text);
+}
+
+function extractTags(text) {
+  if (!text) {
+    return [];
+  }
+  const pattern = /(^|\s)#([A-Za-z]+)\b/g;
+  const seen = new Set();
+  const tags = [];
+  let match;
+  while ((match = pattern.exec(text)) !== null) {
+    const tag = match[2];
+    const key = tag.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    tags.push(tag);
+  }
+  return tags;
+}
+
+function renderTagBar(tags) {
+  tagPills.innerHTML = "";
+  if (!currentNotePath) {
+    tagBar.classList.add("hidden");
+    return;
+  }
+  (tags || []).forEach((tag) => {
+    const pill = document.createElement("button");
+    pill.type = "button";
+    pill.className = "tag-pill";
+    pill.textContent = `#${tag}`;
+    pill.style.backgroundColor = getTagColor(tag);
+    pill.addEventListener("click", () => openTagGroup(tag));
+    tagPills.appendChild(pill);
+  });
+  tagBar.classList.remove("hidden");
+}
+
+function getTagColor(tag) {
+  const value = String(tag || "");
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) % tagPalette.length;
+  }
+  return tagPalette[Math.abs(hash) % tagPalette.length];
+}
+
+function openTagGroup(tag) {
+  if (!tag) {
+    return;
+  }
+  const tagRoot = treeContainer.querySelector(".tree-node.tag-root");
+  if (tagRoot) {
+    tagRoot.classList.remove("collapsed");
+  }
+  const tagRow = treeContainer.querySelector(
+    `.node-row[data-type="tag"][data-tag="${CSS.escape(tag)}"]`
+  );
+  if (!tagRow) {
+    return;
+  }
+  const tagWrapper = tagRow.closest(".tree-node.tag-group");
+  if (tagWrapper) {
+    tagWrapper.classList.remove("collapsed");
+  }
+  tagRow.scrollIntoView({ block: "center" });
 }
 
 function applyHighlighting() {
@@ -112,19 +222,30 @@ function buildTreeNode(node, depth = 0) {
   row.dataset.type = node.type;
 
   if (node.type === "folder") {
-    const caret = document.createElement("span");
-    caret.className = "caret";
-    row.appendChild(caret);
+    const icon = document.createElement("span");
+    icon.className = "folder-icon";
+    row.appendChild(icon);
+  } else if (node.type === "asset") {
+    const icon = document.createElement("span");
+    icon.className = "asset-icon";
+    row.appendChild(icon);
+  } else if (node.type === "pdf") {
+    const icon = document.createElement("span");
+    icon.className = "pdf-icon";
+    row.appendChild(icon);
+  } else if (node.type === "csv") {
+    const icon = document.createElement("span");
+    icon.className = "csv-icon";
+    row.appendChild(icon);
   } else {
-    const spacer = document.createElement("span");
-    spacer.style.width = "10px";
-    spacer.style.height = "10px";
-    row.appendChild(spacer);
+    const icon = document.createElement("span");
+    icon.className = "note-icon";
+    row.appendChild(icon);
   }
 
   const name = document.createElement("span");
   name.className = "node-name";
-  name.textContent = node.name || "(root)";
+  name.textContent = displayNodeName(node);
   row.appendChild(name);
 
   wrapper.appendChild(row);
@@ -143,56 +264,226 @@ function buildTreeNode(node, depth = 0) {
     wrapper.appendChild(children);
 
     row.addEventListener("click", () => {
+      hideContextMenu();
       wrapper.classList.toggle("collapsed");
     });
 
     row.addEventListener("contextmenu", (event) => {
       event.preventDefault();
+      const isCollapsed = wrapper.classList.contains("collapsed");
       showContextMenu(event.clientX, event.clientY, [
         {
-          label: "Edit",
-          action: () => renameFolder(node.path),
+          label: "New Folder",
+          action: () => createFolder(node.path),
         },
         {
           label: "New Note",
           action: () => createNote(node.path),
         },
         {
-          label: "New Child Folder",
-          action: () => createFolder(node.path),
+          label: "Rename",
+          action: () => renameFolder(node.path),
         },
         {
           label: "Delete",
           action: () => deleteFolder(node.path),
+        },
+        {
+          label: isCollapsed ? "Expand" : "Collapse",
+          action: () => wrapper.classList.toggle("collapsed"),
         },
       ]);
     });
   } else {
     row.addEventListener("click", (event) => {
       event.stopPropagation();
-      openNote(node.path);
+      hideContextMenu();
+      if (node.type === "asset") {
+        openAsset(node.path);
+      } else if (node.type === "pdf") {
+        openPdf(node.path);
+      } else if (node.type === "csv") {
+        openCsv(node.path);
+      } else {
+        openNote(node.path);
+      }
     });
+
+    if (node.type === "file") {
+      row.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        const parentPath = node.path.split("/").slice(0, -1).join("/");
+        showContextMenu(event.clientX, event.clientY, [
+          {
+            label: "New Note",
+            action: () => createNote(parentPath),
+          },
+          {
+            label: "Rename",
+            action: () => renameNote(node.path),
+          },
+          {
+            label: "Delete",
+            action: () => deleteNote(node.path),
+          },
+        ]);
+      });
+    }
   }
 
   return wrapper;
 }
 
-function renderTree(tree) {
-  treeContainer.innerHTML = "";
-  if (!tree) {
-    return;
-  }
+function buildTagRoot(tags) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "tree-node folder tag-root collapsed";
 
-  const rootNode = buildTreeNode(tree, 0);
-  rootNode.classList.remove("collapsed");
-  treeContainer.appendChild(rootNode);
-  setActiveNode(currentNotePath);
+  const row = document.createElement("div");
+  row.className = "node-row";
+  row.style.paddingLeft = "12px";
+  row.dataset.path = "__tags__";
+  row.dataset.type = "tag-root";
+
+  const caret = document.createElement("span");
+  caret.className = "folder-icon";
+  row.appendChild(caret);
+
+  const name = document.createElement("span");
+  name.className = "node-name";
+  name.textContent = "Tags";
+  row.appendChild(name);
+
+  wrapper.appendChild(row);
+
+  const children = document.createElement("div");
+  children.className = "node-children";
+  tags.forEach((group) => {
+    children.appendChild(buildTagGroup(group, 1));
+  });
+  wrapper.appendChild(children);
+
+  row.addEventListener("click", () => {
+    hideContextMenu();
+    wrapper.classList.toggle("collapsed");
+  });
+
+  row.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    const isCollapsed = wrapper.classList.contains("collapsed");
+    showContextMenu(event.clientX, event.clientY, [
+      {
+        label: isCollapsed ? "Expand" : "Collapse",
+        action: () => wrapper.classList.toggle("collapsed"),
+      },
+    ]);
+  });
+
+  return wrapper;
+}
+
+function buildTagGroup(group, depth) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "tree-node folder tag-group";
+  wrapper.classList.add("collapsed");
+
+  const row = document.createElement("div");
+  row.className = "node-row";
+  row.style.paddingLeft = `${12 + depth * 12}px`;
+  row.dataset.path = `tag:${group.tag}`;
+  row.dataset.type = "tag";
+  row.dataset.tag = group.tag;
+
+  const caret = document.createElement("span");
+  caret.className = "folder-icon";
+  row.appendChild(caret);
+
+  const name = document.createElement("span");
+  name.className = "node-name tag-label";
+  name.textContent = `#${group.tag}`;
+  name.style.backgroundColor = getTagColor(group.tag);
+  row.appendChild(name);
+
+  wrapper.appendChild(row);
+
+  const children = document.createElement("div");
+  children.className = "node-children";
+  (group.notes || []).forEach((note) => {
+    children.appendChild(buildTagNote(note, depth + 1));
+  });
+  wrapper.appendChild(children);
+
+  row.addEventListener("click", () => {
+    hideContextMenu();
+    wrapper.classList.toggle("collapsed");
+  });
+
+  row.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    const isCollapsed = wrapper.classList.contains("collapsed");
+    showContextMenu(event.clientX, event.clientY, [
+      {
+        label: isCollapsed ? "Expand" : "Collapse",
+        action: () => wrapper.classList.toggle("collapsed"),
+      },
+    ]);
+  });
+
+  return wrapper;
+}
+
+function buildTagNote(note, depth) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "tree-node file";
+
+  const row = document.createElement("div");
+  row.className = "node-row";
+  row.style.paddingLeft = `${12 + depth * 12}px`;
+  row.dataset.path = note.path;
+  row.dataset.type = "file";
+
+  const spacer = document.createElement("span");
+  spacer.className = "note-icon";
+  row.appendChild(spacer);
+
+  const name = document.createElement("span");
+  name.className = "node-name";
+  name.textContent = displayNodeName({ type: "file", name: note.name });
+  row.appendChild(name);
+
+  wrapper.appendChild(row);
+
+  row.addEventListener("click", (event) => {
+    event.stopPropagation();
+    hideContextMenu();
+    openNote(note.path);
+  });
+
+  return wrapper;
+}
+
+function renderTree(tree, tags) {
+  treeContainer.innerHTML = "";
+  if (tree) {
+    const rootNode = buildTreeNode(tree, 0);
+    rootNode.classList.remove("collapsed");
+    treeContainer.appendChild(rootNode);
+  }
+  if (tags) {
+    const tagRoot = buildTagRoot(tags);
+    treeContainer.appendChild(tagRoot);
+  }
+  setActiveNode(currentActivePath);
 }
 
 function setActiveNode(path) {
   const rows = treeContainer.querySelectorAll(".node-row");
   rows.forEach((row) => {
-    row.classList.toggle("active", row.dataset.path === path && row.dataset.type === "file");
+    const isSelectable =
+      row.dataset.type === "file" ||
+      row.dataset.type === "asset" ||
+      row.dataset.type === "pdf" ||
+      row.dataset.type === "csv";
+    row.classList.toggle("active", isSelectable && row.dataset.path === path);
   });
 }
 
@@ -217,8 +508,10 @@ function expandToPath(path) {
 async function loadTree(path = "") {
   try {
     const query = path ? `?path=${encodeURIComponent(path)}` : "";
-    currentTree = await apiFetch(`/tree${query}`);
-    renderTree(currentTree);
+    const [tree, tags] = await Promise.all([apiFetch(`/tree${query}`), apiFetch("/tags")]);
+    currentTree = tree;
+    currentTags = tags;
+    renderTree(currentTree, currentTags);
   } catch (err) {
     alert(err.message);
   }
@@ -228,14 +521,209 @@ async function openNote(path) {
   try {
     const data = await apiFetch(`/notes?path=${encodeURIComponent(path)}`);
     currentNotePath = data.path;
+    currentActivePath = data.path;
     notePath.textContent = data.path;
     editor.value = data.content;
     preview.innerHTML = renderMarkdown(data.content);
+    preview.classList.remove("hidden");
+    assetPreview.classList.add("hidden");
+    assetPreview.innerHTML = "";
+    pdfPreview.classList.add("hidden");
+    pdfPreview.innerHTML = "";
+    csvPreview.classList.add("hidden");
+    csvPreview.innerHTML = "";
+    viewSelector.classList.remove("hidden");
+    viewButtons.forEach((btn) => {
+      btn.disabled = false;
+    });
     applyHighlighting();
+    renderTagBar(extractTags(data.content));
     isDirty = false;
     saveBtn.disabled = false;
     expandToPath(currentNotePath);
-    setActiveNode(currentNotePath);
+    setActiveNode(currentActivePath);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function openAsset(path) {
+  if (!path) {
+    return;
+  }
+  currentNotePath = "";
+  currentActivePath = path;
+  notePath.textContent = path;
+  editor.value = "";
+  preview.innerHTML = "";
+  preview.classList.add("hidden");
+  assetPreview.classList.remove("hidden");
+  assetPreview.innerHTML = "";
+  pdfPreview.classList.add("hidden");
+  pdfPreview.innerHTML = "";
+  csvPreview.classList.add("hidden");
+  csvPreview.innerHTML = "";
+  const img = document.createElement("img");
+  img.src = `${apiBase}/files?path=${encodeURIComponent(path)}`;
+  img.alt = path.split("/").pop() || "Image";
+  assetPreview.appendChild(img);
+  viewSelector.classList.add("hidden");
+  viewButtons.forEach((btn) => {
+    btn.disabled = true;
+  });
+  app.dataset.view = "preview";
+  saveBtn.disabled = true;
+  isDirty = false;
+  renderTagBar([]);
+  expandToPath(path);
+  setActiveNode(currentActivePath);
+}
+
+function openPdf(path) {
+  if (!path) {
+    return;
+  }
+  currentNotePath = "";
+  currentActivePath = path;
+  notePath.textContent = path;
+  editor.value = "";
+  preview.innerHTML = "";
+  preview.classList.add("hidden");
+  assetPreview.classList.add("hidden");
+  assetPreview.innerHTML = "";
+  csvPreview.classList.add("hidden");
+  csvPreview.innerHTML = "";
+  pdfPreview.classList.remove("hidden");
+  pdfPreview.innerHTML = "";
+  const src = `${apiBase}/files?path=${encodeURIComponent(path)}`;
+  const embed = document.createElement("embed");
+  embed.type = "application/pdf";
+  embed.src = src;
+  pdfPreview.appendChild(embed);
+  const fallback = document.createElement("div");
+  fallback.className = "pdf-fallback";
+  const link = document.createElement("a");
+  link.href = src;
+  link.textContent = "Open PDF";
+  link.target = "_blank";
+  link.rel = "noopener";
+  fallback.appendChild(document.createTextNode("PDF preview unavailable. "));
+  fallback.appendChild(link);
+  pdfPreview.appendChild(fallback);
+  viewSelector.classList.add("hidden");
+  viewButtons.forEach((btn) => {
+    btn.disabled = true;
+  });
+  app.dataset.view = "preview";
+  saveBtn.disabled = true;
+  isDirty = false;
+  renderTagBar([]);
+  expandToPath(path);
+  setActiveNode(currentActivePath);
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let value = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === "\"") {
+      if (inQuotes && text[i + 1] === "\"") {
+        value += "\"";
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (char === "," && !inQuotes) {
+      row.push(value);
+      value = "";
+      continue;
+    }
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && text[i + 1] === "\n") {
+        i += 1;
+      }
+      row.push(value);
+      rows.push(row);
+      row = [];
+      value = "";
+      continue;
+    }
+    value += char;
+  }
+  row.push(value);
+  rows.push(row);
+  return rows;
+}
+
+function renderCsvTable(rows) {
+  csvPreview.innerHTML = "";
+  if (!rows || rows.length === 0) {
+    return;
+  }
+  const table = document.createElement("table");
+  table.className = "csv-table";
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  rows[0].forEach((cell) => {
+    const th = document.createElement("th");
+    th.textContent = cell;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  rows.slice(1).forEach((row) => {
+    const tr = document.createElement("tr");
+    row.forEach((cell) => {
+      const td = document.createElement("td");
+      td.textContent = cell;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  csvPreview.appendChild(table);
+}
+
+async function openCsv(path) {
+  if (!path) {
+    return;
+  }
+  try {
+    const response = await fetch(`${apiBase}/files?path=${encodeURIComponent(path)}`);
+    if (!response.ok) {
+      throw new Error("Unable to load CSV file");
+    }
+    const text = await response.text();
+    renderCsvTable(parseCsv(text));
+    currentNotePath = "";
+    currentActivePath = path;
+    notePath.textContent = path;
+    editor.value = "";
+    preview.innerHTML = "";
+    preview.classList.add("hidden");
+    assetPreview.classList.add("hidden");
+    assetPreview.innerHTML = "";
+    pdfPreview.classList.add("hidden");
+    pdfPreview.innerHTML = "";
+    csvPreview.classList.remove("hidden");
+    viewSelector.classList.add("hidden");
+    viewButtons.forEach((btn) => {
+      btn.disabled = true;
+    });
+    app.dataset.view = "preview";
+    saveBtn.disabled = true;
+    isDirty = false;
+    renderTagBar([]);
+    expandToPath(path);
+    setActiveNode(currentActivePath);
   } catch (err) {
     alert(err.message);
   }
@@ -277,6 +765,25 @@ function promptForName(label) {
   return name.trim();
 }
 
+function promptForNameWithDefault(label, defaultValue) {
+  const name = window.prompt(label, defaultValue);
+  if (!name) {
+    return "";
+  }
+  if (name.includes("/") || name.includes("\\")) {
+    alert("Names cannot include slashes.");
+    return "";
+  }
+  return name.trim();
+}
+
+function ensureMarkdownName(name) {
+  if (name.toLowerCase().endsWith(".md")) {
+    return name;
+  }
+  return `${name}.md`;
+}
+
 async function createNote(parentPath = "") {
   const name = promptForName("New note name");
   if (!name) {
@@ -293,6 +800,33 @@ async function createNote(parentPath = "") {
     });
     await loadTree();
     await openNote(data.path);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function renameNote(path) {
+  if (!path) {
+    return;
+  }
+  const currentName = path.split("/").pop() || "";
+  const displayName = displayNodeName({ type: "file", name: currentName });
+  const name = promptForNameWithDefault(`Rename note (${displayName})`, displayName);
+  if (!name) {
+    return;
+  }
+  const base = path.split("/").slice(0, -1).join("/");
+  const newName = ensureMarkdownName(name);
+  const newPath = base ? `${base}/${newName}` : newName;
+  try {
+    const data = await apiFetch("/notes/rename", {
+      method: "PATCH",
+      body: JSON.stringify({ path, newPath }),
+    });
+    await loadTree();
+    if (currentNotePath === path) {
+      await openNote(data.newPath || newPath);
+    }
   } catch (err) {
     alert(err.message);
   }
@@ -357,6 +891,45 @@ async function deleteFolder(path) {
   }
 }
 
+async function deleteNote(path) {
+  if (!path) {
+    return;
+  }
+  const confirmDelete = window.confirm("Delete this note?");
+  if (!confirmDelete) {
+    return;
+  }
+  try {
+    await apiFetch(`/notes?path=${encodeURIComponent(path)}`, {
+      method: "DELETE",
+    });
+    if (currentNotePath === path) {
+      currentNotePath = "";
+      currentActivePath = "";
+      notePath.textContent = "";
+      editor.value = "";
+      preview.innerHTML = "";
+      preview.classList.remove("hidden");
+      assetPreview.classList.add("hidden");
+      assetPreview.innerHTML = "";
+      pdfPreview.classList.add("hidden");
+      pdfPreview.innerHTML = "";
+      csvPreview.classList.add("hidden");
+      csvPreview.innerHTML = "";
+      viewSelector.classList.remove("hidden");
+      viewButtons.forEach((btn) => {
+        btn.disabled = false;
+      });
+      saveBtn.disabled = true;
+      isDirty = false;
+      renderTagBar([]);
+    }
+    await loadTree();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
 function showContextMenu(x, y, items) {
   contextMenu.innerHTML = "";
   items.forEach((item) => {
@@ -379,18 +952,20 @@ function hideContextMenu() {
 }
 
 function renderSearchResults(matches) {
+  const safeMatches = Array.isArray(matches) ? matches : [];
   searchResults.innerHTML = "";
-  if (matches.length === 0) {
+  if (safeMatches.length === 0) {
     const empty = document.createElement("div");
     empty.className = "search-empty";
     empty.textContent = "No matches";
     searchResults.appendChild(empty);
     return;
   }
-  matches.forEach((match) => {
+  safeMatches.forEach((match) => {
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = match.name || match.path.split("/").pop();
+    const rawName = match.name || match.path.split("/").pop();
+    button.textContent = displayNodeName({ type: "file", name: rawName });
     button.title = match.path;
     button.addEventListener("click", () => {
       hideSearchResults();
@@ -437,9 +1012,33 @@ function resolveAssetPath(href) {
 
 function setupSplitters() {
   const isStacked = () => window.matchMedia("(max-width: 720px)").matches;
+  let dragOverlay = null;
+
+  function attachDragOverlay(cursor) {
+    dragOverlay = document.createElement("div");
+    dragOverlay.style.position = "fixed";
+    dragOverlay.style.top = "0";
+    dragOverlay.style.left = "0";
+    dragOverlay.style.width = "100%";
+    dragOverlay.style.height = "100%";
+    dragOverlay.style.zIndex = "999";
+    dragOverlay.style.cursor = cursor;
+    dragOverlay.style.background = "transparent";
+    document.body.appendChild(dragOverlay);
+    document.body.style.userSelect = "none";
+  }
+
+  function detachDragOverlay() {
+    if (dragOverlay) {
+      dragOverlay.remove();
+      dragOverlay = null;
+    }
+    document.body.style.userSelect = "";
+  }
 
   sidebarResizer.addEventListener("mousedown", (event) => {
     event.preventDefault();
+    attachDragOverlay("col-resize");
     const startX = event.clientX;
     const startY = event.clientY;
     const startWidth = sidebar.getBoundingClientRect().width;
@@ -461,6 +1060,7 @@ function setupSplitters() {
     function onUp() {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
+      detachDragOverlay();
     }
 
     document.addEventListener("mousemove", onMove);
@@ -469,6 +1069,7 @@ function setupSplitters() {
 
   paneResizer.addEventListener("mousedown", (event) => {
     event.preventDefault();
+    attachDragOverlay(isStacked() ? "row-resize" : "col-resize");
     const startX = event.clientX;
     const startY = event.clientY;
     const startWidth = editorPane.getBoundingClientRect().width;
@@ -494,6 +1095,7 @@ function setupSplitters() {
     function onUp() {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
+      detachDragOverlay();
     }
 
     document.addEventListener("mousemove", onMove);
@@ -507,7 +1109,101 @@ editor.addEventListener("input", () => {
   isDirty = true;
   preview.innerHTML = renderMarkdown(editor.value);
   applyHighlighting();
+  renderTagBar(extractTags(editor.value));
   saveBtn.disabled = !currentNotePath;
+});
+
+function normalizeTagInput(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) {
+    return "";
+  }
+  const cleaned = trimmed.startsWith("#") ? trimmed.slice(1) : trimmed;
+  const normalized = cleaned.toLowerCase();
+  if (!/^[a-z0-9]+$/.test(normalized)) {
+    return "";
+  }
+  return normalized;
+}
+
+function appendTagToNote(tag) {
+  if (!currentNotePath) {
+    alert("Select a note before adding tags.");
+    return;
+  }
+  const current = editor.value || "";
+  const normalizedTag = normalizeTagInput(tag);
+  if (!normalizedTag) {
+    alert("Tags must contain only letters or numbers.");
+    return;
+  }
+  const lines = current.split("\n");
+  const lastIndex = Math.max(0, lines.length - 1);
+  const prefix = lines[lastIndex].trim().length === 0 ? "" : " ";
+  lines[lastIndex] = `${lines[lastIndex]}${prefix}#${normalizedTag}`;
+  editor.value = lines.join("\n");
+  isDirty = true;
+  preview.innerHTML = renderMarkdown(editor.value);
+  applyHighlighting();
+  renderTagBar(extractTags(editor.value));
+  saveBtn.disabled = !currentNotePath;
+}
+
+function getScrollRatio(element) {
+  const maxScroll = element.scrollHeight - element.clientHeight;
+  if (maxScroll <= 0) {
+    return 0;
+  }
+  return element.scrollTop / maxScroll;
+}
+
+function syncScroll(source, target) {
+  if (syncingScroll) {
+    return;
+  }
+  if (activeScrollSource && source !== activeScrollSource) {
+    return;
+  }
+  syncingScroll = true;
+  const maxSourceScroll = source.scrollHeight - source.clientHeight;
+  const maxTargetScroll = target.scrollHeight - target.clientHeight;
+  const ratio = maxSourceScroll <= 0 ? 0 : source.scrollTop / maxSourceScroll;
+  const topScaled =
+    source.scrollHeight <= 0 ? 0 : source.scrollTop * (target.scrollHeight / source.scrollHeight);
+  const bottomScaled = Math.max(0, maxTargetScroll) * ratio;
+  const blended = topScaled * (1 - ratio) + bottomScaled * ratio;
+  target.scrollTop = Math.max(0, Math.min(maxTargetScroll, blended));
+  requestAnimationFrame(() => {
+    syncingScroll = false;
+  });
+}
+
+function markActiveScrollSource(source) {
+  activeScrollSource = source;
+  if (clearScrollSourceTimer) {
+    clearTimeout(clearScrollSourceTimer);
+  }
+  clearScrollSourceTimer = setTimeout(() => {
+    activeScrollSource = null;
+  }, 140);
+}
+
+editor.addEventListener("wheel", () => markActiveScrollSource(editor), { passive: true });
+preview.addEventListener("wheel", () => markActiveScrollSource(preview), { passive: true });
+editor.addEventListener("touchstart", () => markActiveScrollSource(editor), { passive: true });
+preview.addEventListener("touchstart", () => markActiveScrollSource(preview), { passive: true });
+
+editor.addEventListener("scroll", () => {
+  if (!activeScrollSource) {
+    markActiveScrollSource(editor);
+  }
+  syncScroll(editor, preview);
+});
+preview.addEventListener("scroll", () => {
+  if (!activeScrollSource) {
+    markActiveScrollSource(preview);
+  }
+  syncScroll(preview, editor);
 });
 
 saveBtn.addEventListener("click", () => saveNote());
@@ -516,10 +1212,37 @@ viewButtons.forEach((btn) => {
   btn.addEventListener("click", () => setView(btn.dataset.view));
 });
 
+tagAddBtn.addEventListener("click", () => {
+  const input = window.prompt("Add tag");
+  if (input === null) {
+    return;
+  }
+  appendTagToNote(input);
+});
+
 window.addEventListener("keydown", (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+  if (!(event.metaKey || event.ctrlKey)) {
+    return;
+  }
+  const key = event.key.toLowerCase();
+  if (key === "s" && event.shiftKey) {
     event.preventDefault();
     saveNote();
+    return;
+  }
+  if (key === "e" && event.shiftKey) {
+    event.preventDefault();
+    setView("edit");
+    return;
+  }
+  if (key === "p" && event.shiftKey) {
+    event.preventDefault();
+    setView("preview");
+    return;
+  }
+  if (key === "b" && event.shiftKey) {
+    event.preventDefault();
+    setView("split");
   }
 });
 
@@ -535,6 +1258,11 @@ treeContainer.addEventListener("contextmenu", (event) => {
   ]);
 });
 
+treeContainer.addEventListener("mousedown", () => hideContextMenu(), true);
+mainHeader.addEventListener("mousedown", () => hideContextMenu(), true);
+tagBar.addEventListener("mousedown", () => hideContextMenu(), true);
+previewPane.addEventListener("mousedown", () => hideContextMenu(), true);
+mainContent.addEventListener("mousedown", () => hideContextMenu(), true);
 document.addEventListener("click", () => hideContextMenu());
 
 searchBtn.addEventListener("click", (event) => {

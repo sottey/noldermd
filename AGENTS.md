@@ -4,37 +4,46 @@ NolderMD is a Go-based web application with a separate HTTP API. It presents a
 folder tree of Markdown notes from the local `Notes/` directory, with a main
 pane that supports edit, preview, or split view.
 
-This file documents the intended project shape and interaction model. Concrete
-package layout and commands will be updated as they are implemented.
+This file documents the current project shape and interaction model.
 
 ## Product behavior (high level)
-- Left sidebar shows the `Notes/` directory tree (folders + `.md` files).
+- Left sidebar shows the `Notes/` directory tree (folders + `.md` files) plus a
+  tags root.
 - Main pane shows a Markdown editor, a rendered preview, or a split view with a
   draggable splitter.
 - The sidebar width is adjustable with a draggable splitter.
 - A view selector in the top-right provides edit, preview, and split modes.
 - Context menus:
-  - Right-click on a folder: Edit (rename), New Note, New Child Folder, Delete.
+  - Right-click on a folder: New Folder, New Note, Rename, Delete, Expand/Collapse.
+  - Right-click on a note: New Note, Rename, Delete.
   - Right-click empty area in sidebar: New Folder, New Note.
 - A Refresh button reloads the tree view.
+- Tags are aggregated into a "Tags" root, collapsed by default, and refreshed
+  when the tree reloads.
+- The preview pane shows a sticky tag bar with clickable tag pills for the
+  current note.
+- Editor and preview panes scroll together (proportional sync).
 
-## Architecture (intended)
+## Architecture
 - **CLI**: A Cobra-based entrypoint used to run the server and any future admin
   tasks (example: `noldermd serve --notes-dir ./Notes --port 8080`).
 - **API**: A JSON HTTP API that handles notes and folder operations.
 - **Web app**: A UI that consumes the API and renders the editor + preview.
 - **Storage**: Notes live on disk in the `Notes/` tree as Markdown files.
 
-## API responsibilities (planned)
+## API responsibilities
 - List a recursive folder tree and notes beneath a provided folder.
 - Read/write note contents.
 - Create/rename/delete folders.
 - Create/rename/delete notes.
 - Provide a refresh endpoint or tree reload operation.
+- List tags extracted from note contents.
 
-## UI responsibilities (planned)
+## UI responsibilities
 - Render the folder tree and handle context menus.
+- Render the tags root and tag groups.
 - Render the Markdown editor, preview, and split view with draggable splitter.
+- Render a tag bar in the preview pane.
 - Call API endpoints for all mutations and refresh operations.
 - Provide filename/content search with a dropdown of matches.
 
@@ -49,6 +58,7 @@ package layout and commands will be updated as they are implemented.
   - `GET /api/v1/notes?path=<file>` returns note content and metadata.
   - `POST /api/v1/notes` creates a note at `path` with content.
   - `PATCH /api/v1/notes` updates a note at `path` with content.
+  - `PATCH /api/v1/notes/rename` renames a note from `path` to `newPath`.
   - `DELETE /api/v1/notes?path=<file>` removes the note.
 - **Folders**:
   - `POST /api/v1/folders` creates a folder at `path`.
@@ -58,6 +68,8 @@ package layout and commands will be updated as they are implemented.
   - `GET /api/v1/files?path=<file>` serves a raw file (used for images).
 - **Search**:
   - `GET /api/v1/search?query=<text>` searches note filenames + contents.
+- **Tags**:
+  - `GET /api/v1/tags` returns tags with the notes that contain them.
 - **Health**:
   - `GET /api/v1/health` returns status.
 
@@ -65,6 +77,7 @@ package layout and commands will be updated as they are implemented.
 - Tree responses include metadata only, never file contents.
 - If a note path is missing the `.md` extension, it is appended on create.
 - Only `.md` files are considered notes; other files are ignored.
+- Tags match `#` followed by letters, preceded by whitespace or start of line.
 
 ## Open questions to confirm
 - None currently.
