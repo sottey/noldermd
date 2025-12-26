@@ -104,6 +104,62 @@ func TestTreeEndpoint(t *testing.T) {
 	}
 }
 
+func TestIgnoreDotUnderscoreFiles(t *testing.T) {
+	dir, router := setupTestRouter(t)
+	writeFile(t, filepath.Join(dir, "visible.md"), "Hello #Visible")
+	writeFile(t, filepath.Join(dir, "._hidden.md"), "Hello #Hidden")
+	writeFile(t, filepath.Join(dir, "sub", "._nested.md"), "Nested #Hidden")
+
+	rec := doRequest(t, router, http.MethodGet, "/tree", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var tree TreeNode
+	decodeJSONBody(t, rec, &tree)
+
+	var names []string
+	var visit func(node TreeNode)
+	visit = func(node TreeNode) {
+		names = append(names, node.Name)
+		for _, child := range node.Children {
+			visit(child)
+		}
+	}
+	visit(tree)
+	for _, name := range names {
+		if name == "._hidden.md" || name == "._nested.md" {
+			t.Fatalf("expected ignored file %q to be excluded from tree", name)
+		}
+	}
+
+	rec = doRequest(t, router, http.MethodGet, "/search?query=hidden", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var matches []SearchResult
+	decodeJSONBody(t, rec, &matches)
+	if len(matches) != 0 {
+		t.Fatalf("expected no hidden matches, got %#v", matches)
+	}
+
+	rec = doRequest(t, router, http.MethodGet, "/tags", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var groups []TagGroup
+	decodeJSONBody(t, rec, &groups)
+	groupMap := make(map[string]TagGroup)
+	for _, group := range groups {
+		groupMap[group.Tag] = group
+	}
+	if _, ok := groupMap["Hidden"]; ok {
+		t.Fatalf("expected hidden tag to be excluded")
+	}
+	if _, ok := groupMap["Visible"]; !ok {
+		t.Fatalf("expected Visible tag to be included")
+	}
+}
+
 func TestNotesCRUD(t *testing.T) {
 	_, router := setupTestRouter(t)
 
