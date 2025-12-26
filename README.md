@@ -39,6 +39,8 @@ Open http://localhost:8080.
 - Left sidebar renders a recursive `Notes/` tree with a draggable width splitter.
 - Left sidebar also renders a "Tags" root (collapsed by default), refreshed on
   tree reload.
+- Folder and tag rows show centered chevrons indicating expanded/collapsed
+  state.
 - Main pane supports edit, preview, or split view with a draggable splitter.
 - View selector (top right) toggles edit/preview/split.
 - Preview pane shows a sticky tag bar with clickable tag pills.

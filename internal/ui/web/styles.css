@@ -133,8 +133,27 @@ body {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234e5563' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z'/></svg>");
 }
 
+.tree-node.folder:not(.collapsed) > .node-row .folder-icon {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234e5563' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z'/><path d='M9 11l3 3 3-3'/></svg>");
+}
+
 .tree-node.folder.collapsed > .node-row .folder-icon {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234e5563' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z'/><path d='M10 12l3 3-3 3'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234e5563' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z'/><path d='M11 9l3 3-3 3'/></svg>");
+}
+
+.tree-node.tag-root > .node-row .folder-icon,
+.tree-node.tag-group > .node-row .folder-icon {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234e5563' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3.5 7a2 2 0 0 1 2-2h6.5l8 8-8 8-8.5-8.5V7z'/><circle cx='8.5' cy='8.5' r='1.5'/></svg>");
+}
+
+.tree-node.tag-root:not(.collapsed) > .node-row .folder-icon,
+.tree-node.tag-group:not(.collapsed) > .node-row .folder-icon {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234e5563' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3.5 7a2 2 0 0 1 2-2h6.5l8 8-8 8-8.5-8.5V7z'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='M9 11l3 3 3-3'/></svg>");
+}
+
+.tree-node.tag-root.collapsed > .node-row .folder-icon,
+.tree-node.tag-group.collapsed > .node-row .folder-icon {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234e5563' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3.5 7a2 2 0 0 1 2-2h6.5l8 8-8 8-8.5-8.5V7z'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='M11 9l3 3-3 3'/></svg>");
 }
 
 .note-icon {

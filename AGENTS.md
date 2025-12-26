@@ -23,6 +23,8 @@ This file documents the current project shape and interaction model.
 - The preview pane shows a sticky tag bar with clickable tag pills for the
   current note.
 - Editor and preview panes scroll together (proportional sync).
+- Folder and tag rows show centered chevrons indicating expanded/collapsed
+  state.
 
 ## Architecture
 - **CLI**: A Cobra-based entrypoint used to run the server and any future admin
