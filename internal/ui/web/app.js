@@ -34,6 +34,7 @@ const settingsDefaultView = document.getElementById("settings-default-view");
 const settingsAutosaveEnabled = document.getElementById("settings-autosave-enabled");
 const settingsAutosaveInterval = document.getElementById("settings-autosave-interval");
 const settingsDefaultFolder = document.getElementById("settings-default-folder");
+const settingsDailyFolder = document.getElementById("settings-daily-folder");
 const taskEditor = document.getElementById("task-editor");
 const taskTitleInput = document.getElementById("task-title");
 const taskProjectInput = document.getElementById("task-project");
@@ -393,6 +394,7 @@ function applySettings(settings) {
     autosaveIntervalSeconds: Number(settings.autosaveIntervalSeconds) || 30,
     sidebarWidth: Number(settings.sidebarWidth) || 300,
     defaultFolder: settings.defaultFolder || "",
+    dailyFolder: settings.dailyFolder || "",
   };
   document.body.classList.toggle("theme-dark", currentSettings.darkMode);
   if (settingsDarkMode) {
@@ -409,6 +411,9 @@ function applySettings(settings) {
   }
   if (settingsDefaultFolder) {
     settingsDefaultFolder.value = currentSettings.defaultFolder;
+  }
+  if (settingsDailyFolder) {
+    settingsDailyFolder.value = currentSettings.dailyFolder;
   }
   applyAutosave(currentSettings);
   applySidebarWidth(currentSettings.sidebarWidth);
@@ -454,6 +459,9 @@ function showSettings() {
   if (settingsDefaultFolder) {
     settingsDefaultFolder.value = currentSettings.defaultFolder || "";
   }
+  if (settingsDailyFolder) {
+    settingsDailyFolder.value = currentSettings.dailyFolder || "";
+  }
 }
 
 async function saveSettings() {
@@ -462,7 +470,8 @@ async function saveSettings() {
     !settingsDefaultView ||
     !settingsAutosaveEnabled ||
     !settingsAutosaveInterval ||
-    !settingsDefaultFolder
+    !settingsDefaultFolder ||
+    !settingsDailyFolder
   ) {
     return;
   }
@@ -476,6 +485,7 @@ async function saveSettings() {
       autosaveIntervalSeconds: Number(settingsAutosaveInterval.value) || 30,
       sidebarWidth: currentSettings.sidebarWidth || 300,
       defaultFolder: settingsDefaultFolder.value.trim(),
+      dailyFolder: settingsDailyFolder.value.trim(),
     };
     const updated = await apiFetch("/settings", {
       method: "PATCH",
@@ -2160,6 +2170,17 @@ if (settingsDefaultFolder) {
       return;
     }
     currentSettings.defaultFolder = settingsDefaultFolder.value.trim();
+    isDirty = true;
+    saveBtn.disabled = false;
+  });
+}
+
+if (settingsDailyFolder) {
+  settingsDailyFolder.addEventListener("input", () => {
+    if (currentMode !== "settings") {
+      return;
+    }
+    currentSettings.dailyFolder = settingsDailyFolder.value.trim();
     isDirty = true;
     saveBtn.disabled = false;
   });

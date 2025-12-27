@@ -1,5 +1,26 @@
 {
   "version": 1,
   "tasks": [
+    {
+      "id": "5bcaf8c5-8991-48b1-ad0e-445fd4903e79",
+      "title": "This is a #home task due tomorrow which is \u003e2025-12-28 in the project +Home it's priority is -1",
+      "project": "Home",
+      "tags": [
+        "home",
+        "test"
+      ],
+      "created": "2025-12-27T18:28:03.118785Z",
+      "updated": "2025-12-27T18:30:01.255969Z",
+      "duedate": "2025-12-28",
+      "priority": 1,
+      "completed": false,
+      "notes": "",
+      "recurring": null,
+      "source": {
+        "notePath": "00.Daily/2025-12-27.md",
+        "lineNumber": 23,
+        "lineHash": "f8c8fd977c90324cac765d556a5f16d02a2b789a76b0e5bc20f396ac77150efa"
+      }
+    }
   ]
 }

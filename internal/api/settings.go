@@ -18,6 +18,7 @@ type Settings struct {
 	AutosaveIntervalSeconds int    `json:"autosaveIntervalSeconds"`
 	SidebarWidth            int    `json:"sidebarWidth"`
 	DefaultFolder           string `json:"defaultFolder"`
+	DailyFolder             string `json:"dailyFolder"`
 }
 
 type SettingsResponse struct {
@@ -32,6 +33,7 @@ type SettingsPayload struct {
 	AutosaveIntervalSeconds *int    `json:"autosaveIntervalSeconds,omitempty"`
 	SidebarWidth            *int    `json:"sidebarWidth,omitempty"`
 	DefaultFolder           *string `json:"defaultFolder,omitempty"`
+	DailyFolder             *string `json:"dailyFolder,omitempty"`
 }
 
 func (s *Server) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
@@ -84,6 +86,9 @@ func (s *Server) handleSettingsUpdate(w http.ResponseWriter, r *http.Request) {
 	if payload.DefaultFolder != nil {
 		settings.DefaultFolder = *payload.DefaultFolder
 	}
+	if payload.DailyFolder != nil {
+		settings.DailyFolder = *payload.DailyFolder
+	}
 	if err := s.saveSettings(settings); err != nil {
 		writeError(w, http.StatusInternalServerError, "unable to save settings")
 		return
@@ -105,13 +110,14 @@ func (s *Server) loadSettings() (Settings, string, error) {
 				Version:                 1,
 				DarkMode:                false,
 				DefaultView:             "split",
-				AutosaveEnabled:         false,
-				AutosaveIntervalSeconds: 30,
-				SidebarWidth:            300,
-				DefaultFolder:           "",
-			}
-			if err := os.MkdirAll(s.notesDir, 0o755); err != nil {
-				return settings, "", err
+			AutosaveEnabled:         false,
+			AutosaveIntervalSeconds: 30,
+			SidebarWidth:            300,
+			DefaultFolder:           "",
+			DailyFolder:             "",
+		}
+		if err := os.MkdirAll(s.notesDir, 0o755); err != nil {
+			return settings, "", err
 			}
 			if err := s.saveSettings(settings); err != nil {
 				return settings, "", err
@@ -139,6 +145,9 @@ func (s *Server) loadSettings() (Settings, string, error) {
 	}
 	if settings.DefaultFolder == "." {
 		settings.DefaultFolder = ""
+	}
+	if settings.DailyFolder == "." {
+		settings.DailyFolder = ""
 	}
 
 	return settings, "", nil
@@ -176,6 +185,13 @@ func validateSettingsPayload(payload SettingsPayload) error {
 			return err
 		}
 		*payload.DefaultFolder = cleaned
+	}
+	if payload.DailyFolder != nil {
+		cleaned, err := cleanRelPath(*payload.DailyFolder)
+		if err != nil {
+			return err
+		}
+		*payload.DailyFolder = cleaned
 	}
 	return nil
 }

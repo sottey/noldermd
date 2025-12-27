@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func setupTestRouter(t *testing.T) (string, http.Handler) {
@@ -83,8 +84,8 @@ func TestTreeEndpoint(t *testing.T) {
 	if tree.Type != "folder" {
 		t.Fatalf("expected root type folder, got %q", tree.Type)
 	}
-	if tree.Name == "" {
-		t.Fatalf("expected root name")
+	if tree.Name != "Notes" {
+		t.Fatalf("expected root name Notes, got %q", tree.Name)
 	}
 	foundRoot := false
 	foundSub := false
@@ -101,6 +102,40 @@ func TestTreeEndpoint(t *testing.T) {
 	}
 	if !foundRoot || !foundSub {
 		t.Fatalf("expected root.md and sub folder in tree")
+	}
+}
+
+func TestTreeCreatesDailyNoteFromTemplate(t *testing.T) {
+	dir, router := setupTestRouter(t)
+	dailyDir := filepath.Join(dir, "Daily")
+	if err := os.MkdirAll(dailyDir, 0o755); err != nil {
+		t.Fatalf("mkdir Daily: %v", err)
+	}
+	settings := []byte(`{"dailyFolder":"Daily"}`)
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), settings, 0o644); err != nil {
+		t.Fatalf("write settings.json: %v", err)
+	}
+	templateContent := "Daily template\nLine two"
+	if err := os.WriteFile(filepath.Join(dailyDir, "daily.template"), []byte(templateContent), 0o644); err != nil {
+		t.Fatalf("write daily.template: %v", err)
+	}
+
+	originalNow := timeNow
+	timeNow = func() time.Time { return time.Date(2025, 1, 5, 10, 0, 0, 0, time.UTC) }
+	t.Cleanup(func() { timeNow = originalNow })
+
+	rec := doRequest(t, router, http.MethodGet, "/tree", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	dailyNotePath := filepath.Join(dailyDir, "2025-01-05.md")
+	data, err := os.ReadFile(dailyNotePath)
+	if err != nil {
+		t.Fatalf("read daily note: %v", err)
+	}
+	if string(data) != templateContent {
+		t.Fatalf("expected daily note to match template, got %q", string(data))
 	}
 }
 
@@ -220,6 +255,115 @@ func TestNotesCRUD(t *testing.T) {
 	rec = doRequest(t, router, http.MethodDelete, "/notes?path=renamed.md", nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+}
+
+func TestNoteTasksSync(t *testing.T) {
+	_, router := setupTestRouter(t)
+
+	initialContent := strings.Join([]string{
+		"Intro",
+		"* Task one in +Home project >2025-12-27 -3 #Home #test",
+		"",
+	}, "\n")
+
+	rec := doRequest(t, router, http.MethodPost, "/notes", map[string]string{
+		"path":    "tasks-note.md",
+		"content": initialContent,
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", rec.Code)
+	}
+
+	rec = doRequest(t, router, http.MethodGet, "/tasks", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var list TaskListResponse
+	decodeJSONBody(t, rec, &list)
+	if len(list.Tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(list.Tasks))
+	}
+	created := list.Tasks[0]
+	if created.Title != "Task one in +Home project >2025-12-27 -3 #Home #test" {
+		t.Fatalf("unexpected title: %q", created.Title)
+	}
+	if created.Project != "Home" {
+		t.Fatalf("expected project Home, got %q", created.Project)
+	}
+	if created.DueDate != "2025-12-27" {
+		t.Fatalf("expected due date 2025-12-27, got %q", created.DueDate)
+	}
+	if created.Priority != 3 {
+		t.Fatalf("expected priority 3, got %d", created.Priority)
+	}
+	if len(created.Tags) != 2 || created.Tags[0] != "home" || created.Tags[1] != "test" {
+		t.Fatalf("expected tags [home test], got %#v", created.Tags)
+	}
+	if created.Source == nil || created.Source.NotePath != "tasks-note.md" || created.Source.LineNumber != 2 || created.Source.LineHash == "" {
+		t.Fatalf("expected source metadata to be set, got %#v", created.Source)
+	}
+
+	updatedContent := strings.Join([]string{
+		"Intro",
+		"* Task one updated +Work >2025-12-28 -2 #NewTag",
+	}, "\n")
+
+	rec = doRequest(t, router, http.MethodPatch, "/notes", map[string]string{
+		"path":    "tasks-note.md",
+		"content": updatedContent,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	rec = doRequest(t, router, http.MethodGet, "/tasks", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	decodeJSONBody(t, rec, &list)
+	if len(list.Tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(list.Tasks))
+	}
+	updated := list.Tasks[0]
+	if updated.ID != created.ID {
+		t.Fatalf("expected same task id, got %q", updated.ID)
+	}
+	if updated.Project != "Work" || updated.DueDate != "2025-12-28" || updated.Priority != 2 {
+		t.Fatalf("expected updated fields, got project=%q due=%q priority=%d", updated.Project, updated.DueDate, updated.Priority)
+	}
+	if updated.Source == nil || updated.Source.LineNumber != 2 {
+		t.Fatalf("expected source line 2, got %#v", updated.Source)
+	}
+
+	movedContent := strings.Join([]string{
+		"New top line",
+		"Intro",
+		"* Task one updated +Work >2025-12-28 -2 #NewTag",
+	}, "\n")
+
+	rec = doRequest(t, router, http.MethodPatch, "/notes", map[string]string{
+		"path":    "tasks-note.md",
+		"content": movedContent,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	rec = doRequest(t, router, http.MethodGet, "/tasks", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	decodeJSONBody(t, rec, &list)
+	if len(list.Tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(list.Tasks))
+	}
+	moved := list.Tasks[0]
+	if moved.ID != created.ID {
+		t.Fatalf("expected same task id after move, got %q", moved.ID)
+	}
+	if moved.Source == nil || moved.Source.LineNumber != 3 {
+		t.Fatalf("expected source line 3 after move, got %#v", moved.Source)
 	}
 }
 

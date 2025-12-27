@@ -17,6 +17,8 @@ type Server struct {
 	notesDir string
 }
 
+var timeNow = time.Now
+
 type TreeNode struct {
 	Name     string     `json:"name"`
 	Path     string     `json:"path"`
@@ -62,6 +64,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleTree(w http.ResponseWriter, r *http.Request) {
+	if err := s.ensureDailyNote(); err != nil {
+		writeError(w, http.StatusInternalServerError, "unable to ensure daily note")
+		return
+	}
 	pathParam := r.URL.Query().Get("path")
 	absPath, relPath, err := s.resolvePath(pathParam)
 	if err != nil {
@@ -83,9 +89,8 @@ func (s *Server) handleTree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rootName := filepath.Base(absPath)
 	root := TreeNode{
-		Name: rootName,
+		Name: "Notes",
 		Path: relPath,
 		Type: "folder",
 	}
@@ -181,6 +186,11 @@ func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := s.syncTasksFromNote(relPath, payload.Content); err != nil {
+		writeError(w, http.StatusInternalServerError, "unable to sync tasks from note")
+		return
+	}
+
 	writeJSON(w, http.StatusCreated, map[string]string{"path": relPath})
 }
 
@@ -221,6 +231,11 @@ func (s *Server) handleUpdateNote(w http.ResponseWriter, r *http.Request) {
 
 	if err := os.WriteFile(absPath, []byte(payload.Content), 0o644); err != nil {
 		writeError(w, http.StatusInternalServerError, "unable to update note")
+		return
+	}
+
+	if err := s.syncTasksFromNote(relPath, payload.Content); err != nil {
+		writeError(w, http.StatusInternalServerError, "unable to sync tasks from note")
 		return
 	}
 
@@ -743,6 +758,48 @@ func (s *Server) resolvePath(input string) (string, string, error) {
 	}
 
 	return absPath, filepath.ToSlash(clean), nil
+}
+
+func (s *Server) ensureDailyNote() error {
+	settings, _, err := s.loadSettings()
+	if err != nil {
+		return err
+	}
+	dailyFolder := strings.TrimSpace(settings.DailyFolder)
+	if dailyFolder == "" {
+		return nil
+	}
+	cleaned, err := cleanRelPath(dailyFolder)
+	if err != nil {
+		return err
+	}
+
+	dailyDir := filepath.Join(s.notesDir, cleaned)
+	info, err := os.Stat(dailyDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if !info.IsDir() {
+		return nil
+	}
+
+	today := timeNow().Format("2006-01-02")
+	notePath := filepath.Join(dailyDir, today+".md")
+	if _, err := os.Stat(notePath); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	templatePath := filepath.Join(dailyDir, "daily.template")
+	content, err := os.ReadFile(templatePath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return os.WriteFile(notePath, content, 0o644)
 }
 
 func cleanRelPath(input string) (string, error) {

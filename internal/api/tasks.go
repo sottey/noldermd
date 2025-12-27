@@ -20,17 +20,24 @@ const tasksFileName = "tasks.json"
 const dueDateLayout = "2006-01-02"
 
 type Task struct {
-	ID        string    `json:"id"`
-	Title     string    `json:"title"`
-	Project   string    `json:"project"`
-	Tags      []string  `json:"tags"`
-	Created   time.Time `json:"created"`
-	Updated   time.Time `json:"updated"`
-	DueDate   string    `json:"duedate"`
-	Priority  int       `json:"priority"`
-	Completed bool      `json:"completed"`
-	Notes     string    `json:"notes"`
-	Recurring any       `json:"recurring"`
+	ID        string      `json:"id"`
+	Title     string      `json:"title"`
+	Project   string      `json:"project"`
+	Tags      []string    `json:"tags"`
+	Created   time.Time   `json:"created"`
+	Updated   time.Time   `json:"updated"`
+	DueDate   string      `json:"duedate"`
+	Priority  int         `json:"priority"`
+	Completed bool        `json:"completed"`
+	Notes     string      `json:"notes"`
+	Recurring any         `json:"recurring"`
+	Source    *TaskSource `json:"source,omitempty"`
+}
+
+type TaskSource struct {
+	NotePath   string `json:"notePath"`
+	LineNumber int    `json:"lineNumber"`
+	LineHash   string `json:"lineHash"`
 }
 
 type TaskStore struct {
