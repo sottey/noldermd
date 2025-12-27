@@ -32,5 +32,8 @@ go.work.sum
 # .vscode/
 .DS_Store
 go.sum
-Notes/***
-noldermd/***
+data/01.Home
+data/02.Cottage
+data/03.Coding
+data/04.Work
+data/05.System
