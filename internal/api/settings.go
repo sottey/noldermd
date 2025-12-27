@@ -16,6 +16,7 @@ type Settings struct {
 	DefaultView             string `json:"defaultView"`
 	AutosaveEnabled         bool   `json:"autosaveEnabled"`
 	AutosaveIntervalSeconds int    `json:"autosaveIntervalSeconds"`
+	SidebarWidth            int    `json:"sidebarWidth"`
 }
 
 type SettingsResponse struct {
@@ -24,10 +25,11 @@ type SettingsResponse struct {
 }
 
 type SettingsPayload struct {
-	DarkMode                bool   `json:"darkMode"`
-	DefaultView             string `json:"defaultView"`
-	AutosaveEnabled         bool   `json:"autosaveEnabled"`
-	AutosaveIntervalSeconds int    `json:"autosaveIntervalSeconds"`
+	DarkMode                *bool   `json:"darkMode,omitempty"`
+	DefaultView             *string `json:"defaultView,omitempty"`
+	AutosaveEnabled         *bool   `json:"autosaveEnabled,omitempty"`
+	AutosaveIntervalSeconds *int    `json:"autosaveIntervalSeconds,omitempty"`
+	SidebarWidth            *int    `json:"sidebarWidth,omitempty"`
 }
 
 func (s *Server) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
@@ -62,10 +64,21 @@ func (s *Server) handleSettingsUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	settings.DarkMode = payload.DarkMode
-	settings.DefaultView = payload.DefaultView
-	settings.AutosaveEnabled = payload.AutosaveEnabled
-	settings.AutosaveIntervalSeconds = payload.AutosaveIntervalSeconds
+	if payload.DarkMode != nil {
+		settings.DarkMode = *payload.DarkMode
+	}
+	if payload.DefaultView != nil {
+		settings.DefaultView = *payload.DefaultView
+	}
+	if payload.AutosaveEnabled != nil {
+		settings.AutosaveEnabled = *payload.AutosaveEnabled
+	}
+	if payload.AutosaveIntervalSeconds != nil {
+		settings.AutosaveIntervalSeconds = *payload.AutosaveIntervalSeconds
+	}
+	if payload.SidebarWidth != nil {
+		settings.SidebarWidth = *payload.SidebarWidth
+	}
 	if err := s.saveSettings(settings); err != nil {
 		writeError(w, http.StatusInternalServerError, "unable to save settings")
 		return
@@ -89,6 +102,7 @@ func (s *Server) loadSettings() (Settings, string, error) {
 				DefaultView:             "split",
 				AutosaveEnabled:         false,
 				AutosaveIntervalSeconds: 30,
+				SidebarWidth:            300,
 			}
 			if err := os.MkdirAll(s.notesDir, 0o755); err != nil {
 				return settings, "", err
@@ -114,6 +128,9 @@ func (s *Server) loadSettings() (Settings, string, error) {
 	if settings.AutosaveIntervalSeconds == 0 {
 		settings.AutosaveIntervalSeconds = 30
 	}
+	if settings.SidebarWidth == 0 {
+		settings.SidebarWidth = 300
+	}
 
 	return settings, "", nil
 }
@@ -128,14 +145,21 @@ func (s *Server) saveSettings(settings Settings) error {
 }
 
 func validateSettingsPayload(payload SettingsPayload) error {
-	switch payload.DefaultView {
-	case "edit", "preview", "split":
-		// ok
-	default:
-		return errors.New("defaultView must be edit, preview, or split")
+	if payload.DefaultView != nil {
+		switch *payload.DefaultView {
+		case "edit", "preview", "split":
+			// ok
+		default:
+			return errors.New("defaultView must be edit, preview, or split")
+		}
 	}
-	if payload.AutosaveIntervalSeconds < 5 {
+	if payload.AutosaveIntervalSeconds != nil && *payload.AutosaveIntervalSeconds < 5 {
 		return errors.New("autosaveIntervalSeconds must be at least 5 seconds")
+	}
+	if payload.SidebarWidth != nil {
+		if *payload.SidebarWidth < 220 || *payload.SidebarWidth > 600 {
+			return errors.New("sidebarWidth must be between 220 and 600")
+		}
 	}
 	return nil
 }

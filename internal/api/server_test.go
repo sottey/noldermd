@@ -344,6 +344,9 @@ func TestSettingsCRUD(t *testing.T) {
 	if settingsResp.Settings.AutosaveIntervalSeconds != 30 {
 		t.Fatalf("expected autosaveIntervalSeconds 30, got %d", settingsResp.Settings.AutosaveIntervalSeconds)
 	}
+	if settingsResp.Settings.SidebarWidth != 300 {
+		t.Fatalf("expected sidebarWidth 300, got %d", settingsResp.Settings.SidebarWidth)
+	}
 	if _, err := os.Stat(filepath.Join(dir, "settings.json")); err != nil {
 		t.Fatalf("expected settings.json to exist")
 	}
@@ -353,6 +356,7 @@ func TestSettingsCRUD(t *testing.T) {
 		"defaultView":             "preview",
 		"autosaveEnabled":         true,
 		"autosaveIntervalSeconds": 10,
+		"sidebarWidth":            280,
 	})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)
@@ -371,6 +375,9 @@ func TestSettingsCRUD(t *testing.T) {
 	if updated.AutosaveIntervalSeconds != 10 {
 		t.Fatalf("expected autosaveIntervalSeconds 10, got %d", updated.AutosaveIntervalSeconds)
 	}
+	if updated.SidebarWidth != 280 {
+		t.Fatalf("expected sidebarWidth 280, got %d", updated.SidebarWidth)
+	}
 
 	rec = doRequest(t, router, http.MethodGet, "/settings", nil)
 	if rec.Code != http.StatusOK {
@@ -386,6 +393,9 @@ func TestSettingsCRUD(t *testing.T) {
 	}
 	if !settingsResp.Settings.AutosaveEnabled {
 		t.Fatalf("expected autosaveEnabled true from settings")
+	}
+	if settingsResp.Settings.SidebarWidth != 280 {
+		t.Fatalf("expected sidebarWidth 280 from settings")
 	}
 }
 

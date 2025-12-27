@@ -340,12 +340,23 @@ function applyAutosave(settings) {
   }, intervalMs);
 }
 
+function applySidebarWidth(width) {
+  if (!width || Number.isNaN(width)) {
+    return;
+  }
+  const clamped = Math.min(600, Math.max(220, Math.round(width)));
+  sidebar.style.width = `${clamped}px`;
+  document.documentElement.style.setProperty("--sidebar-width", `${clamped}px`);
+  currentSettings.sidebarWidth = clamped;
+}
+
 function applySettings(settings) {
   currentSettings = {
     darkMode: !!settings.darkMode,
     defaultView: getDefaultView(settings.defaultView),
     autosaveEnabled: !!settings.autosaveEnabled,
     autosaveIntervalSeconds: Number(settings.autosaveIntervalSeconds) || 30,
+    sidebarWidth: Number(settings.sidebarWidth) || 300,
   };
   document.body.classList.toggle("theme-dark", currentSettings.darkMode);
   if (settingsDarkMode) {
@@ -361,6 +372,7 @@ function applySettings(settings) {
     settingsAutosaveInterval.value = String(currentSettings.autosaveIntervalSeconds);
   }
   applyAutosave(currentSettings);
+  applySidebarWidth(currentSettings.sidebarWidth);
 }
 
 function showSettings() {
@@ -414,6 +426,7 @@ async function saveSettings() {
       defaultView: settingsDefaultView.value,
       autosaveEnabled: settingsAutosaveEnabled.checked,
       autosaveIntervalSeconds: Number(settingsAutosaveInterval.value) || 30,
+      sidebarWidth: currentSettings.sidebarWidth || 300,
     };
     const updated = await apiFetch("/settings", {
       method: "PATCH",
@@ -427,6 +440,19 @@ async function saveSettings() {
     saveBtn.textContent = "Save";
     saveBtn.disabled = false;
     alert(err.message);
+  }
+}
+
+async function saveSidebarWidth(width) {
+  const clamped = Math.min(600, Math.max(220, Math.round(width)));
+  try {
+    await apiFetch("/settings", {
+      method: "PATCH",
+      body: JSON.stringify({ sidebarWidth: clamped }),
+    });
+    currentSettings.sidebarWidth = clamped;
+  } catch (err) {
+    console.warn("Unable to save sidebar width", err);
   }
 }
 
@@ -1917,6 +1943,10 @@ function setupSplitters() {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
       detachDragOverlay();
+      if (!isStacked()) {
+        const width = sidebar.getBoundingClientRect().width;
+        saveSidebarWidth(width);
+      }
     }
 
     document.addEventListener("mousemove", onMove);
