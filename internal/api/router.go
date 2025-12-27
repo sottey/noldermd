@@ -18,6 +18,8 @@ func NewRouter(notesDir string) chi.Router {
 	r.Get("/files", s.handleGetFile)
 	r.Get("/search", s.handleSearch)
 	r.Get("/tags", s.handleTags)
+	r.Get("/settings", s.handleSettingsGet)
+	r.Patch("/settings", s.handleSettingsUpdate)
 	r.Post("/folders", s.handleCreateFolder)
 	r.Patch("/folders", s.handleRenameFolder)
 	r.Delete("/folders", s.handleDeleteFolder)

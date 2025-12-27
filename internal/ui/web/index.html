@@ -13,12 +13,19 @@
       <div class="sidebar-header">
         <div class="sidebar-title">
           <div class="brand">NolderMD</div>
-          <button id="refresh-btn" class="ghost icon-btn" title="Refresh" aria-label="Refresh">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 6V3l-4 4 4 4V8a4 4 0 1 1-4 4H6a6 6 0 1 0 6-6z"/>
-              <path d="M16 12a4 4 0 0 1-4 4v3l4-4-4-4v3a2 2 0 0 0 2-2h2z"/>
-            </svg>
-          </button>
+          <div class="sidebar-actions">
+            <button id="refresh-btn" class="ghost icon-btn" title="Refresh" aria-label="Refresh">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 6V3l-4 4 4 4V8a4 4 0 1 1-4 4H6a6 6 0 1 0 6-6z"/>
+                <path d="M16 12a4 4 0 0 1-4 4v3l4-4-4-4v3a2 2 0 0 0 2-2h2z"/>
+              </svg>
+            </button>
+            <button id="settings-btn" class="ghost icon-btn" title="Settings" aria-label="Settings">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M19.14 12.94a7.5 7.5 0 0 0 .05-.94 7.5 7.5 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.06 7.06 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54a7.06 7.06 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.7 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.5 7.5 0 0 0-.05.94 7.5 7.5 0 0 0 .05.94L2.82 14.5a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.72 1.63.94l.36 2.54a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54c.58-.22 1.12-.55 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.56zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/>
+              </svg>
+            </button>
+          </div>
         </div>
         <div class="search-row">
           <input id="search-input" class="search-input" type="text" placeholder="Search notes and tasks" />
@@ -106,6 +113,35 @@
               <label class="task-field task-field-wide">
                 <span class="task-label">Notes</span>
                 <textarea id="task-notes" class="task-textarea" spellcheck="false"></textarea>
+              </label>
+            </div>
+          </div>
+          <div id="settings-panel" class="settings-panel hidden">
+            <h2 class="settings-title">Settings</h2>
+            <div class="settings-grid">
+              <label class="settings-row">
+                <input id="settings-dark-mode" type="checkbox" />
+                <span>Dark Mode</span>
+              </label>
+              <label class="settings-field">
+                <span class="settings-label">Default View</span>
+                <select id="settings-default-view" class="settings-input">
+                  <option value="edit">Edit</option>
+                  <option value="preview">Preview</option>
+                  <option value="split">Split</option>
+                </select>
+              </label>
+              <label class="settings-row">
+                <input id="settings-autosave-enabled" type="checkbox" />
+                <span>Autosave Notes</span>
+              </label>
+              <label class="settings-field">
+                <span class="settings-label">Autosave Interval</span>
+                <select id="settings-autosave-interval" class="settings-input">
+                  <option value="10">10 seconds</option>
+                  <option value="30">30 seconds</option>
+                  <option value="60">60 seconds</option>
+                </select>
               </label>
             </div>
           </div>

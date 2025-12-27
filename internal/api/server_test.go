@@ -326,6 +326,69 @@ func TestTasksCRUD(t *testing.T) {
 	}
 }
 
+func TestSettingsCRUD(t *testing.T) {
+	dir, router := setupTestRouter(t)
+
+	rec := doRequest(t, router, http.MethodGet, "/settings", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var settingsResp SettingsResponse
+	decodeJSONBody(t, rec, &settingsResp)
+	if settingsResp.Notice == "" {
+		t.Fatalf("expected notice when creating settings.json")
+	}
+	if settingsResp.Settings.DefaultView != "split" {
+		t.Fatalf("expected defaultView split, got %q", settingsResp.Settings.DefaultView)
+	}
+	if settingsResp.Settings.AutosaveIntervalSeconds != 30 {
+		t.Fatalf("expected autosaveIntervalSeconds 30, got %d", settingsResp.Settings.AutosaveIntervalSeconds)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "settings.json")); err != nil {
+		t.Fatalf("expected settings.json to exist")
+	}
+
+	rec = doRequest(t, router, http.MethodPatch, "/settings", map[string]any{
+		"darkMode":                true,
+		"defaultView":             "preview",
+		"autosaveEnabled":         true,
+		"autosaveIntervalSeconds": 10,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var updated Settings
+	decodeJSONBody(t, rec, &updated)
+	if !updated.DarkMode {
+		t.Fatalf("expected darkMode true")
+	}
+	if updated.DefaultView != "preview" {
+		t.Fatalf("expected defaultView preview, got %q", updated.DefaultView)
+	}
+	if !updated.AutosaveEnabled {
+		t.Fatalf("expected autosaveEnabled true")
+	}
+	if updated.AutosaveIntervalSeconds != 10 {
+		t.Fatalf("expected autosaveIntervalSeconds 10, got %d", updated.AutosaveIntervalSeconds)
+	}
+
+	rec = doRequest(t, router, http.MethodGet, "/settings", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	settingsResp = SettingsResponse{}
+	decodeJSONBody(t, rec, &settingsResp)
+	if !settingsResp.Settings.DarkMode {
+		t.Fatalf("expected darkMode true from settings")
+	}
+	if settingsResp.Settings.DefaultView != "preview" {
+		t.Fatalf("expected defaultView preview from settings")
+	}
+	if !settingsResp.Settings.AutosaveEnabled {
+		t.Fatalf("expected autosaveEnabled true from settings")
+	}
+}
+
 func TestSearchEndpoint(t *testing.T) {
 	dir, router := setupTestRouter(t)
 	writeFile(t, filepath.Join(dir, "alpha.md"), "hello world")

@@ -27,6 +27,12 @@ const assetPreview = document.getElementById("asset-preview");
 const pdfPreview = document.getElementById("pdf-preview");
 const csvPreview = document.getElementById("csv-preview");
 const summaryPanel = document.getElementById("summary-panel");
+const settingsBtn = document.getElementById("settings-btn");
+const settingsPanel = document.getElementById("settings-panel");
+const settingsDarkMode = document.getElementById("settings-dark-mode");
+const settingsDefaultView = document.getElementById("settings-default-view");
+const settingsAutosaveEnabled = document.getElementById("settings-autosave-enabled");
+const settingsAutosaveInterval = document.getElementById("settings-autosave-interval");
 const taskEditor = document.getElementById("task-editor");
 const taskTitleInput = document.getElementById("task-title");
 const taskProjectInput = document.getElementById("task-project");
@@ -47,6 +53,10 @@ let currentTaskId = "";
 let currentTask = null;
 let currentMode = "note";
 let lastNoteView = "split";
+let currentSettings = { darkMode: false };
+let settingsLoaded = false;
+let autosaveTimer = null;
+let autosaveInFlight = false;
 let isDirty = false;
 let syncingScroll = false;
 let activeScrollSource = null;
@@ -196,6 +206,7 @@ function showTaskEditor() {
   currentMode = "task";
   currentNotePath = "";
   summaryPanel.classList.add("hidden");
+  settingsPanel.classList.add("hidden");
   taskEditor.classList.remove("hidden");
   editor.classList.add("hidden");
   preview.classList.add("hidden");
@@ -218,6 +229,7 @@ function showNoteEditor() {
   currentTaskId = "";
   currentTask = null;
   summaryPanel.classList.add("hidden");
+  settingsPanel.classList.add("hidden");
   taskEditor.classList.add("hidden");
   editor.classList.remove("hidden");
   viewSelector.classList.remove("hidden");
@@ -260,6 +272,7 @@ function showSummary(title, items) {
     btn.disabled = true;
   });
   taskEditor.classList.add("hidden");
+  settingsPanel.classList.add("hidden");
   editor.classList.add("hidden");
   preview.classList.add("hidden");
   assetPreview.classList.add("hidden");
@@ -293,6 +306,128 @@ function showSummary(title, items) {
     grid.appendChild(card);
   });
   summaryPanel.appendChild(grid);
+}
+
+function getDefaultView(value) {
+  if (value === "edit" || value === "preview" || value === "split") {
+    return value;
+  }
+  return "split";
+}
+
+function applyAutosave(settings) {
+  if (autosaveTimer) {
+    clearInterval(autosaveTimer);
+    autosaveTimer = null;
+  }
+  if (!settings.autosaveEnabled) {
+    return;
+  }
+  const intervalMs = Math.max(5000, settings.autosaveIntervalSeconds * 1000);
+  autosaveTimer = setInterval(async () => {
+    if (autosaveInFlight) {
+      return;
+    }
+    if (currentMode !== "note" || !currentNotePath || !isDirty) {
+      return;
+    }
+    autosaveInFlight = true;
+    try {
+      await saveNote();
+    } finally {
+      autosaveInFlight = false;
+    }
+  }, intervalMs);
+}
+
+function applySettings(settings) {
+  currentSettings = {
+    darkMode: !!settings.darkMode,
+    defaultView: getDefaultView(settings.defaultView),
+    autosaveEnabled: !!settings.autosaveEnabled,
+    autosaveIntervalSeconds: Number(settings.autosaveIntervalSeconds) || 30,
+  };
+  document.body.classList.toggle("theme-dark", currentSettings.darkMode);
+  if (settingsDarkMode) {
+    settingsDarkMode.checked = currentSettings.darkMode;
+  }
+  if (settingsDefaultView) {
+    settingsDefaultView.value = currentSettings.defaultView;
+  }
+  if (settingsAutosaveEnabled) {
+    settingsAutosaveEnabled.checked = currentSettings.autosaveEnabled;
+  }
+  if (settingsAutosaveInterval) {
+    settingsAutosaveInterval.value = String(currentSettings.autosaveIntervalSeconds);
+  }
+  applyAutosave(currentSettings);
+}
+
+function showSettings() {
+  currentMode = "settings";
+  currentNotePath = "";
+  currentTaskId = "";
+  currentTask = null;
+  notePath.textContent = "Settings";
+  tagBar.classList.add("hidden");
+  viewSelector.classList.add("hidden");
+  viewButtons.forEach((btn) => {
+    btn.disabled = true;
+  });
+  summaryPanel.classList.add("hidden");
+  taskEditor.classList.add("hidden");
+  editor.classList.add("hidden");
+  preview.classList.add("hidden");
+  assetPreview.classList.add("hidden");
+  assetPreview.innerHTML = "";
+  pdfPreview.classList.add("hidden");
+  pdfPreview.innerHTML = "";
+  csvPreview.classList.add("hidden");
+  csvPreview.innerHTML = "";
+  settingsPanel.classList.remove("hidden");
+  setView("edit", true);
+  saveBtn.disabled = true;
+  isDirty = false;
+  if (settingsDarkMode) {
+    settingsDarkMode.checked = currentSettings.darkMode;
+  }
+  if (settingsDefaultView) {
+    settingsDefaultView.value = currentSettings.defaultView || "split";
+  }
+  if (settingsAutosaveEnabled) {
+    settingsAutosaveEnabled.checked = !!currentSettings.autosaveEnabled;
+  }
+  if (settingsAutosaveInterval) {
+    settingsAutosaveInterval.value = String(currentSettings.autosaveIntervalSeconds || 30);
+  }
+}
+
+async function saveSettings() {
+  if (!settingsDarkMode || !settingsDefaultView || !settingsAutosaveEnabled || !settingsAutosaveInterval) {
+    return;
+  }
+  try {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+    const payload = {
+      darkMode: settingsDarkMode.checked,
+      defaultView: settingsDefaultView.value,
+      autosaveEnabled: settingsAutosaveEnabled.checked,
+      autosaveIntervalSeconds: Number(settingsAutosaveInterval.value) || 30,
+    };
+    const updated = await apiFetch("/settings", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    applySettings(updated);
+    isDirty = false;
+    saveBtn.textContent = "Save";
+    saveBtn.disabled = false;
+  } catch (err) {
+    saveBtn.textContent = "Save";
+    saveBtn.disabled = false;
+    alert(err.message);
+  }
 }
 
 function fillTaskEditor(task) {
@@ -682,7 +817,7 @@ function buildTaskGroup(name, tasks, depth) {
     const items = [];
     if (name !== "Completed") {
       items.push({
-        label: "Create Note",
+        label: "New Task",
         action: () => createTask(name === "No Project" ? "" : name),
       });
     }
@@ -1019,18 +1154,36 @@ function expandToPath(path) {
 async function loadTree(path = "") {
   try {
     const query = path ? `?path=${encodeURIComponent(path)}` : "";
-    const [tree, tags, tasksResponse] = await Promise.all([
+    const [tree, tags, tasksResponse, settingsResponse] = await Promise.all([
       apiFetch(`/tree${query}`),
       apiFetch("/tags"),
       apiFetch("/tasks"),
+      apiFetch("/settings"),
     ]);
     if (tasksResponse.notice) {
       alert(tasksResponse.notice);
     }
+    if (settingsResponse.notice && !settingsLoaded) {
+      alert(settingsResponse.notice);
+    }
+    settingsLoaded = true;
+    applySettings(settingsResponse.settings || {});
     currentTree = tree;
     currentTags = tags;
     currentTasks = tasksResponse.tasks || [];
     renderTree(currentTree, currentTags, tasksResponse.tasks || []);
+    if (currentTree && currentTree.type === "folder" && currentTree.children) {
+      const counts = countTreeItems(currentTree);
+      currentActivePath = "";
+      setActiveNode(currentActivePath);
+      showSummary("Notes", [
+        { label: "Folders", value: counts.folders },
+        { label: "Notes", value: counts.notes },
+        { label: "Assets", value: counts.assets },
+        { label: "PDFs", value: counts.pdfs },
+        { label: "CSVs", value: counts.csvs },
+      ]);
+    }
   } catch (err) {
     alert(err.message);
   }
@@ -1056,6 +1209,7 @@ async function openNote(path) {
     viewButtons.forEach((btn) => {
       btn.disabled = false;
     });
+    setView(getDefaultView(currentSettings.defaultView), true);
     applyHighlighting();
     renderTagBar(extractTags(data.content));
     isDirty = false;
@@ -1075,6 +1229,7 @@ function openAsset(path) {
   currentTaskId = "";
   currentTask = null;
   summaryPanel.classList.add("hidden");
+  settingsPanel.classList.add("hidden");
   taskEditor.classList.add("hidden");
   editor.classList.remove("hidden");
   currentNotePath = "";
@@ -1113,6 +1268,7 @@ function openPdf(path) {
   currentTaskId = "";
   currentTask = null;
   summaryPanel.classList.add("hidden");
+  settingsPanel.classList.add("hidden");
   taskEditor.classList.add("hidden");
   editor.classList.remove("hidden");
   currentNotePath = "";
@@ -1239,6 +1395,7 @@ async function openCsv(path) {
     currentTaskId = "";
     currentTask = null;
     summaryPanel.classList.add("hidden");
+    settingsPanel.classList.add("hidden");
     taskEditor.classList.add("hidden");
     editor.classList.remove("hidden");
     currentNotePath = "";
@@ -1358,7 +1515,9 @@ async function saveTask() {
 }
 
 function saveCurrent() {
-  if (currentMode === "task") {
+  if (currentMode === "settings") {
+    saveSettings();
+  } else if (currentMode === "task") {
     saveTask();
   } else {
     saveNote();
@@ -1801,6 +1960,10 @@ function setupSplitters() {
 }
 
 refreshBtn.addEventListener("click", () => loadTree());
+settingsBtn.addEventListener("click", () => {
+  hideContextMenu();
+  showSettings();
+});
 
 editor.addEventListener("input", () => {
   if (currentMode !== "note") {
@@ -1837,6 +2000,50 @@ function markTaskDirty() {
 
 if (taskCompletedInput) {
   taskCompletedInput.addEventListener("change", () => markTaskDirty());
+}
+
+if (settingsDarkMode) {
+  settingsDarkMode.addEventListener("change", () => {
+    if (currentMode !== "settings") {
+      return;
+    }
+    applySettings({ ...currentSettings, darkMode: settingsDarkMode.checked });
+    isDirty = true;
+    saveBtn.disabled = false;
+  });
+}
+
+if (settingsDefaultView) {
+  settingsDefaultView.addEventListener("change", () => {
+    if (currentMode !== "settings") {
+      return;
+    }
+    currentSettings.defaultView = getDefaultView(settingsDefaultView.value);
+    isDirty = true;
+    saveBtn.disabled = false;
+  });
+}
+
+if (settingsAutosaveEnabled) {
+  settingsAutosaveEnabled.addEventListener("change", () => {
+    if (currentMode !== "settings") {
+      return;
+    }
+    currentSettings.autosaveEnabled = settingsAutosaveEnabled.checked;
+    isDirty = true;
+    saveBtn.disabled = false;
+  });
+}
+
+if (settingsAutosaveInterval) {
+  settingsAutosaveInterval.addEventListener("change", () => {
+    if (currentMode !== "settings") {
+      return;
+    }
+    currentSettings.autosaveIntervalSeconds = Number(settingsAutosaveInterval.value) || 30;
+    isDirty = true;
+    saveBtn.disabled = false;
+  });
 }
 
 function normalizeTagInput(value) {

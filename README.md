@@ -26,6 +26,8 @@ Open http://localhost:8080.
 - `GET /files?path=<file>` (raw file, used for images)
 - `GET /search?query=<text>` (searches filenames + contents)
 - `GET /tags` (tags with notes that contain them)
+- `GET /settings` (app settings)
+- `PATCH /settings` `{ "darkMode": true, "defaultView": "split", "autosaveEnabled": false, "autosaveIntervalSeconds": 30 }`
 - `GET /tasks` (lists tasks)
 - `GET /tasks/<id>` (fetch task)
 - `POST /tasks` `{ "title": "...", "project": "...", "tags": [], "duedate": "YYYY-MM-DD", "priority": 3, "completed": false, "notes": "..." }`
@@ -47,6 +49,13 @@ Open http://localhost:8080.
 - Priority is 1-5 (1 highest, 5 lowest).
 - Due dates are stored as `YYYY-MM-DD`.
 
+## Settings rules
+
+- Settings live in `Notes/settings.json` and are created automatically if missing.
+- `darkMode` toggles the UI theme.
+- `defaultView` controls the initial note view (`edit`, `preview`, `split`).
+- `autosaveEnabled` and `autosaveIntervalSeconds` control note autosave.
+
 ## UX behavior
 
 - Left sidebar renders a recursive `Notes/` tree with a draggable width splitter.
@@ -58,6 +67,8 @@ Open http://localhost:8080.
   state.
 - Main pane supports edit, preview, or split view with a draggable splitter.
 - View selector (top right) toggles edit/preview/split.
+- Settings button sits beside refresh in the sidebar header and opens a settings form.
+- Settings include dark mode, default view, and autosave options.
 - Preview pane shows a sticky tag bar with clickable tag pills.
 - Context menus:
   - Folder: New Folder, New Note, Rename, Delete, Expand/Collapse.

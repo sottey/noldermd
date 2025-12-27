@@ -15,6 +15,7 @@ This file documents the current project shape and interaction model.
   panel in the main pane.
 - Main pane shows a Markdown editor, a rendered preview, or a split view with a
   draggable splitter.
+- Settings button in the sidebar header opens a settings form.
 - The sidebar width is adjustable with a draggable splitter.
 - A view selector in the top-right provides edit, preview, and split modes.
 - Context menus:
@@ -45,6 +46,7 @@ This file documents the current project shape and interaction model.
 - Provide a refresh endpoint or tree reload operation.
 - List tags extracted from note contents.
 - Read/write tasks stored in `Notes/tasks.json`.
+- Read/write settings stored in `Notes/settings.json`.
 
 ## UI responsibilities
 - Render the folder tree and handle context menus.
@@ -52,6 +54,8 @@ This file documents the current project shape and interaction model.
 - Render the tasks root and project groups.
 - Render the Markdown editor, preview, and split view with draggable splitter.
 - Render a task editor form that mirrors the note editor controls.
+- Render a settings form (dark mode, default view, autosave).
+- Ensure tag labels remain legible in dark mode.
 - Render a tag bar in the preview pane.
 - Call API endpoints for all mutations and refresh operations.
 - Provide filename/content search with a dropdown of matches.
@@ -85,6 +89,9 @@ This file documents the current project shape and interaction model.
   - `POST /api/v1/tasks` creates a task.
   - `PATCH /api/v1/tasks/<id>` updates a task.
   - `DELETE /api/v1/tasks/<id>` deletes a task.
+- **Settings**:
+  - `GET /api/v1/settings` returns settings.
+  - `PATCH /api/v1/settings` updates settings.
 - **Health**:
   - `GET /api/v1/health` returns status.
 
@@ -95,6 +102,7 @@ This file documents the current project shape and interaction model.
 - Files starting with `._` are ignored.
 - Tags match `#` followed by letters, preceded by whitespace or start of line.
 - Tasks live in `Notes/tasks.json` and use UUIDs for ids.
+- Settings live in `Notes/settings.json`.
 
 ## Open questions to confirm
 - None currently.
