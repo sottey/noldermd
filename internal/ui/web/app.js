@@ -26,11 +26,27 @@ const tagPills = document.getElementById("tag-pills");
 const assetPreview = document.getElementById("asset-preview");
 const pdfPreview = document.getElementById("pdf-preview");
 const csvPreview = document.getElementById("csv-preview");
+const summaryPanel = document.getElementById("summary-panel");
+const taskEditor = document.getElementById("task-editor");
+const taskTitleInput = document.getElementById("task-title");
+const taskProjectInput = document.getElementById("task-project");
+const taskTagsInput = document.getElementById("task-tags");
+const taskDueDateInput = document.getElementById("task-duedate");
+const taskPriorityInput = document.getElementById("task-priority");
+const taskCompletedInput = document.getElementById("task-completed");
+const taskNotesInput = document.getElementById("task-notes");
+const taskCreatedText = document.getElementById("task-created");
+const taskUpdatedText = document.getElementById("task-updated");
 
 let currentNotePath = "";
 let currentActivePath = "";
 let currentTree = null;
 let currentTags = [];
+let currentTasks = [];
+let currentTaskId = "";
+let currentTask = null;
+let currentMode = "note";
+let lastNoteView = "split";
 let isDirty = false;
 let syncingScroll = false;
 let activeScrollSource = null;
@@ -55,14 +71,17 @@ const tagPalette = [
   "#fae8ff",
 ];
 
-function setView(view) {
-  if (viewSelector.classList.contains("hidden")) {
+function setView(view, force = false) {
+  if (!force && viewSelector.classList.contains("hidden")) {
     return;
   }
   app.dataset.view = view;
   viewButtons.forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.view === view);
   });
+  if (currentMode === "note") {
+    lastNoteView = view;
+  }
 }
 
 function escapeHtml(value) {
@@ -152,6 +171,142 @@ function renderTagBar(tags) {
   tagBar.classList.remove("hidden");
 }
 
+function formatDateTime(value) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toLocaleString();
+}
+
+function parseTagsInput(value) {
+  return String(value || "")
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function showTaskEditor() {
+  if (currentMode === "note") {
+    lastNoteView = app.dataset.view;
+  }
+  currentMode = "task";
+  currentNotePath = "";
+  summaryPanel.classList.add("hidden");
+  taskEditor.classList.remove("hidden");
+  editor.classList.add("hidden");
+  preview.classList.add("hidden");
+  assetPreview.classList.add("hidden");
+  assetPreview.innerHTML = "";
+  pdfPreview.classList.add("hidden");
+  pdfPreview.innerHTML = "";
+  csvPreview.classList.add("hidden");
+  csvPreview.innerHTML = "";
+  viewSelector.classList.add("hidden");
+  viewButtons.forEach((btn) => {
+    btn.disabled = true;
+  });
+  setView("edit", true);
+  tagBar.classList.add("hidden");
+}
+
+function showNoteEditor() {
+  currentMode = "note";
+  currentTaskId = "";
+  currentTask = null;
+  summaryPanel.classList.add("hidden");
+  taskEditor.classList.add("hidden");
+  editor.classList.remove("hidden");
+  viewSelector.classList.remove("hidden");
+  viewButtons.forEach((btn) => {
+    btn.disabled = false;
+  });
+  setView(lastNoteView || "split");
+}
+
+function clearTaskEditor() {
+  taskTitleInput.value = "";
+  taskProjectInput.value = "";
+  taskTagsInput.value = "";
+  taskDueDateInput.value = "";
+  taskPriorityInput.value = "3";
+  taskCompletedInput.checked = false;
+  taskNotesInput.value = "";
+  taskCreatedText.textContent = "";
+  taskUpdatedText.textContent = "";
+  notePath.textContent = "No task selected";
+  currentTaskId = "";
+  currentTask = null;
+  currentActivePath = "";
+  isDirty = false;
+  saveBtn.disabled = true;
+  showTaskEditor();
+  setActiveNode(currentActivePath);
+}
+
+function showSummary(title, items) {
+  currentMode = "summary";
+  currentNotePath = "";
+  currentTaskId = "";
+  currentTask = null;
+  notePath.textContent = title;
+  saveBtn.disabled = true;
+  tagBar.classList.add("hidden");
+  viewSelector.classList.add("hidden");
+  viewButtons.forEach((btn) => {
+    btn.disabled = true;
+  });
+  taskEditor.classList.add("hidden");
+  editor.classList.add("hidden");
+  preview.classList.add("hidden");
+  assetPreview.classList.add("hidden");
+  assetPreview.innerHTML = "";
+  pdfPreview.classList.add("hidden");
+  pdfPreview.innerHTML = "";
+  csvPreview.classList.add("hidden");
+  csvPreview.innerHTML = "";
+  summaryPanel.innerHTML = "";
+  summaryPanel.classList.remove("hidden");
+  setView("preview", true);
+
+  const heading = document.createElement("h2");
+  heading.className = "summary-title";
+  heading.textContent = title;
+  summaryPanel.appendChild(heading);
+
+  const grid = document.createElement("div");
+  grid.className = "summary-grid";
+  items.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "summary-item";
+    const label = document.createElement("div");
+    label.className = "summary-label";
+    label.textContent = item.label;
+    const value = document.createElement("div");
+    value.className = "summary-value";
+    value.textContent = String(item.value);
+    card.appendChild(label);
+    card.appendChild(value);
+    grid.appendChild(card);
+  });
+  summaryPanel.appendChild(grid);
+}
+
+function fillTaskEditor(task) {
+  taskTitleInput.value = task.title || "";
+  taskProjectInput.value = task.project || "";
+  taskTagsInput.value = Array.isArray(task.tags) ? task.tags.join(", ") : "";
+  taskDueDateInput.value = task.duedate || "";
+  taskPriorityInput.value = String(task.priority || 3);
+  taskCompletedInput.checked = !!task.completed;
+  taskNotesInput.value = task.notes || "";
+  taskCreatedText.textContent = formatDateTime(task.created);
+  taskUpdatedText.textContent = formatDateTime(task.updated);
+}
+
 function getTagColor(tag) {
   const value = String(tag || "");
   let hash = 0;
@@ -214,6 +369,9 @@ async function apiFetch(path, options = {}) {
 function buildTreeNode(node, depth = 0) {
   const wrapper = document.createElement("div");
   wrapper.className = `tree-node ${node.type}`;
+  if (node.type === "folder" && depth === 0) {
+    wrapper.classList.add("note-root");
+  }
 
   const row = document.createElement("div");
   row.className = "node-row";
@@ -266,6 +424,17 @@ function buildTreeNode(node, depth = 0) {
     row.addEventListener("click", () => {
       hideContextMenu();
       wrapper.classList.toggle("collapsed");
+      const counts = countTreeItems(node);
+      currentActivePath = node.path || "";
+      setActiveNode(currentActivePath);
+      const title = depth === 0 ? "Notes" : `Folder: ${node.name}`;
+      showSummary(title, [
+        { label: "Folders", value: counts.folders },
+        { label: "Notes", value: counts.notes },
+        { label: "Assets", value: counts.assets },
+        { label: "PDFs", value: counts.pdfs },
+        { label: "CSVs", value: counts.csvs },
+      ]);
     });
 
     row.addEventListener("contextmenu", (event) => {
@@ -334,6 +503,303 @@ function buildTreeNode(node, depth = 0) {
   return wrapper;
 }
 
+function getSortableDueDate(value) {
+  if (!value) {
+    return new Date("9999-12-31T00:00:00Z");
+  }
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) {
+    return new Date("9999-12-31T00:00:00Z");
+  }
+  return date;
+}
+
+function compareTasks(a, b) {
+  const dateA = getSortableDueDate(a.duedate);
+  const dateB = getSortableDueDate(b.duedate);
+  if (dateA.getTime() !== dateB.getTime()) {
+    return dateA - dateB;
+  }
+  const priorityA = Number(a.priority) || 0;
+  const priorityB = Number(b.priority) || 0;
+  if (priorityA !== priorityB) {
+    return priorityB - priorityA;
+  }
+  const updatedA = new Date(a.updated || 0);
+  const updatedB = new Date(b.updated || 0);
+  return updatedA - updatedB;
+}
+
+function countTreeItems(node) {
+  const counts = {
+    folders: 0,
+    notes: 0,
+    assets: 0,
+    pdfs: 0,
+    csvs: 0,
+  };
+  if (!node || !node.children) {
+    return counts;
+  }
+  const stack = [...node.children];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) {
+      continue;
+    }
+    switch (current.type) {
+      case "folder":
+        counts.folders += 1;
+        if (current.children && current.children.length > 0) {
+          stack.push(...current.children);
+        }
+        break;
+      case "file":
+        counts.notes += 1;
+        break;
+      case "asset":
+        counts.assets += 1;
+        break;
+      case "pdf":
+        counts.pdfs += 1;
+        break;
+      case "csv":
+        counts.csvs += 1;
+        break;
+      default:
+        break;
+    }
+  }
+  return counts;
+}
+
+function buildTaskNode(task, depth) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "tree-node task";
+
+  const row = document.createElement("div");
+  row.className = "node-row";
+  row.style.paddingLeft = `${12 + depth * 12}px`;
+  row.dataset.path = `task:${task.id}`;
+  row.dataset.type = "task";
+  row.dataset.taskId = task.id;
+  if (task.completed) {
+    row.dataset.completed = "true";
+  }
+
+  const icon = document.createElement("span");
+  icon.className = "task-icon";
+  row.appendChild(icon);
+
+  const name = document.createElement("span");
+  name.className = "node-name";
+  name.textContent = task.title || "(untitled)";
+  row.appendChild(name);
+
+  wrapper.appendChild(row);
+
+  row.addEventListener("click", (event) => {
+    event.stopPropagation();
+    hideContextMenu();
+    openTask(task.id);
+  });
+
+  row.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    const isCompleted = !!task.completed;
+    showContextMenu(event.clientX, event.clientY, [
+      {
+        label: "Edit",
+        action: () => openTask(task.id),
+      },
+      {
+        label: isCompleted ? "Mark Incomplete" : "Mark Complete",
+        action: () => setTaskCompletion(task.id, !isCompleted),
+      },
+      {
+        label: "Delete",
+        action: () => deleteTask(task.id),
+      },
+    ]);
+  });
+
+  return wrapper;
+}
+
+function buildTaskGroup(name, tasks, depth) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "tree-node folder task-group collapsed";
+
+  const row = document.createElement("div");
+  row.className = "node-row";
+  row.style.paddingLeft = `${12 + depth * 12}px`;
+  row.dataset.path = `task-group:${name}`;
+  row.dataset.type = "task-group";
+
+  const caret = document.createElement("span");
+  caret.className = "folder-icon";
+  row.appendChild(caret);
+
+  const label = document.createElement("span");
+  label.className = "node-name";
+  label.textContent = name;
+  row.appendChild(label);
+
+  wrapper.appendChild(row);
+
+  const children = document.createElement("div");
+  children.className = "node-children";
+  const sortedTasks = [...tasks].sort(compareTasks);
+  sortedTasks.forEach((task) => {
+    children.appendChild(buildTaskNode(task, depth + 1));
+  });
+  wrapper.appendChild(children);
+
+  row.addEventListener("click", () => {
+    hideContextMenu();
+    wrapper.classList.toggle("collapsed");
+    const total = (tasks || []).length;
+    const completed = (tasks || []).filter((task) => task.completed).length;
+    const active = total - completed;
+    currentActivePath = `task-group:${name}`;
+    setActiveNode(currentActivePath);
+    let title = `Project: ${name}`;
+    if (name === "No Project") {
+      title = "No Project";
+    } else if (name === "Completed") {
+      title = "Completed Tasks";
+    }
+    showSummary(title, [
+      { label: "Total Tasks", value: total },
+      { label: "Completed", value: completed },
+      { label: "Active", value: active },
+    ]);
+  });
+
+  row.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    const isCollapsed = wrapper.classList.contains("collapsed");
+    const items = [];
+    if (name !== "Completed") {
+      items.push({
+        label: "Create Note",
+        action: () => createTask(name === "No Project" ? "" : name),
+      });
+    }
+    items.push({
+      label: isCollapsed ? "Expand" : "Collapse",
+      action: () => wrapper.classList.toggle("collapsed"),
+    });
+    showContextMenu(event.clientX, event.clientY, items);
+  });
+
+  return wrapper;
+}
+
+function buildTasksRoot(tasks) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "tree-node folder task-root";
+
+  const row = document.createElement("div");
+  row.className = "node-row";
+  row.style.paddingLeft = "12px";
+  row.dataset.path = "__tasks__";
+  row.dataset.type = "task-root";
+
+  const caret = document.createElement("span");
+  caret.className = "folder-icon";
+  row.appendChild(caret);
+
+  const name = document.createElement("span");
+  name.className = "node-name";
+  name.textContent = "Tasks";
+  row.appendChild(name);
+
+  wrapper.appendChild(row);
+
+  const children = document.createElement("div");
+  children.className = "node-children";
+
+  const projectMap = new Map();
+  const noProject = [];
+  const completed = [];
+
+  (tasks || []).forEach((task) => {
+    if (task.completed) {
+      completed.push(task);
+      return;
+    }
+    const projectName = (task.project || "").trim();
+    if (!projectName) {
+      noProject.push(task);
+      return;
+    }
+    if (!projectMap.has(projectName)) {
+      projectMap.set(projectName, []);
+    }
+    projectMap.get(projectName).push(task);
+  });
+
+  const projectNames = Array.from(projectMap.keys()).sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" })
+  );
+
+  projectNames.forEach((project) => {
+    children.appendChild(buildTaskGroup(project, projectMap.get(project) || [], 1));
+  });
+
+  children.appendChild(buildTaskGroup("No Project", noProject, 1));
+  children.appendChild(buildTaskGroup("Completed", completed, 1));
+
+  wrapper.appendChild(children);
+
+  row.addEventListener("click", () => {
+    hideContextMenu();
+    wrapper.classList.toggle("collapsed");
+    const completedCount = (tasks || []).filter((task) => task.completed).length;
+    const projectSet = new Set();
+    let noProjectCount = 0;
+    (tasks || []).forEach((task) => {
+      const projectName = (task.project || "").trim();
+      if (!projectName) {
+        noProjectCount += 1;
+        return;
+      }
+      projectSet.add(projectName);
+    });
+    currentActivePath = "__tasks__";
+    setActiveNode(currentActivePath);
+    showSummary("Tasks", [
+      { label: "Total Tasks", value: (tasks || []).length },
+      { label: "Completed", value: completedCount },
+      { label: "Active", value: (tasks || []).length - completedCount },
+      { label: "Projects", value: projectSet.size },
+      { label: "No Project", value: noProjectCount },
+    ]);
+  });
+
+  row.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    const isCollapsed = wrapper.classList.contains("collapsed");
+    showContextMenu(event.clientX, event.clientY, [
+      {
+        label: "New Task",
+        action: () => createTask(""),
+      },
+      {
+        label: "Refresh",
+        action: () => loadTree(),
+      },
+      {
+        label: isCollapsed ? "Expand" : "Collapse",
+        action: () => wrapper.classList.toggle("collapsed"),
+      },
+    ]);
+  });
+
+  return wrapper;
+}
+
 function buildTagRoot(tags) {
   const wrapper = document.createElement("div");
   wrapper.className = "tree-node folder tag-root collapsed";
@@ -365,6 +831,24 @@ function buildTagRoot(tags) {
   row.addEventListener("click", () => {
     hideContextMenu();
     wrapper.classList.toggle("collapsed");
+    const totalTags = (tags || []).length;
+    const noteSet = new Set();
+    let totalEntries = 0;
+    (tags || []).forEach((group) => {
+      (group.notes || []).forEach((note) => {
+        if (note && note.path) {
+          noteSet.add(note.path);
+        }
+        totalEntries += 1;
+      });
+    });
+    currentActivePath = "__tags__";
+    setActiveNode(currentActivePath);
+    showSummary("Tags", [
+      { label: "Tags", value: totalTags },
+      { label: "Tagged Notes", value: noteSet.size },
+      { label: "Tag Entries", value: totalEntries },
+    ]);
   });
 
   row.addEventListener("contextmenu", (event) => {
@@ -415,6 +899,24 @@ function buildTagGroup(group, depth) {
   row.addEventListener("click", () => {
     hideContextMenu();
     wrapper.classList.toggle("collapsed");
+    const totalTags = (tags || []).length;
+    const noteSet = new Set();
+    let totalEntries = 0;
+    (tags || []).forEach((group) => {
+      (group.notes || []).forEach((note) => {
+        if (note && note.path) {
+          noteSet.add(note.path);
+        }
+        totalEntries += 1;
+      });
+    });
+    currentActivePath = "__tags__";
+    setActiveNode(currentActivePath);
+    showSummary("Tags", [
+      { label: "Tags", value: totalTags },
+      { label: "Tagged Notes", value: noteSet.size },
+      { label: "Tag Entries", value: totalEntries },
+    ]);
   });
 
   row.addEventListener("contextmenu", (event) => {
@@ -461,12 +963,16 @@ function buildTagNote(note, depth) {
   return wrapper;
 }
 
-function renderTree(tree, tags) {
+function renderTree(tree, tags, tasks) {
   treeContainer.innerHTML = "";
   if (tree) {
     const rootNode = buildTreeNode(tree, 0);
     rootNode.classList.remove("collapsed");
     treeContainer.appendChild(rootNode);
+  }
+  if (tasks) {
+    const tasksRoot = buildTasksRoot(tasks);
+    treeContainer.appendChild(tasksRoot);
   }
   if (tags) {
     const tagRoot = buildTagRoot(tags);
@@ -482,7 +988,12 @@ function setActiveNode(path) {
       row.dataset.type === "file" ||
       row.dataset.type === "asset" ||
       row.dataset.type === "pdf" ||
-      row.dataset.type === "csv";
+      row.dataset.type === "csv" ||
+      row.dataset.type === "task" ||
+      row.dataset.type === "task-root" ||
+      row.dataset.type === "tag-root" ||
+      row.dataset.type === "task-group" ||
+      row.dataset.type === "folder";
     row.classList.toggle("active", isSelectable && row.dataset.path === path);
   });
 }
@@ -508,10 +1019,18 @@ function expandToPath(path) {
 async function loadTree(path = "") {
   try {
     const query = path ? `?path=${encodeURIComponent(path)}` : "";
-    const [tree, tags] = await Promise.all([apiFetch(`/tree${query}`), apiFetch("/tags")]);
+    const [tree, tags, tasksResponse] = await Promise.all([
+      apiFetch(`/tree${query}`),
+      apiFetch("/tags"),
+      apiFetch("/tasks"),
+    ]);
+    if (tasksResponse.notice) {
+      alert(tasksResponse.notice);
+    }
     currentTree = tree;
     currentTags = tags;
-    renderTree(currentTree, currentTags);
+    currentTasks = tasksResponse.tasks || [];
+    renderTree(currentTree, currentTags, tasksResponse.tasks || []);
   } catch (err) {
     alert(err.message);
   }
@@ -519,6 +1038,7 @@ async function loadTree(path = "") {
 
 async function openNote(path) {
   try {
+    showNoteEditor();
     const data = await apiFetch(`/notes?path=${encodeURIComponent(path)}`);
     currentNotePath = data.path;
     currentActivePath = data.path;
@@ -551,6 +1071,12 @@ function openAsset(path) {
   if (!path) {
     return;
   }
+  currentMode = "asset";
+  currentTaskId = "";
+  currentTask = null;
+  summaryPanel.classList.add("hidden");
+  taskEditor.classList.add("hidden");
+  editor.classList.remove("hidden");
   currentNotePath = "";
   currentActivePath = path;
   notePath.textContent = path;
@@ -583,6 +1109,12 @@ function openPdf(path) {
   if (!path) {
     return;
   }
+  currentMode = "asset";
+  currentTaskId = "";
+  currentTask = null;
+  summaryPanel.classList.add("hidden");
+  taskEditor.classList.add("hidden");
+  editor.classList.remove("hidden");
   currentNotePath = "";
   currentActivePath = path;
   notePath.textContent = path;
@@ -703,6 +1235,12 @@ async function openCsv(path) {
     }
     const text = await response.text();
     renderCsvTable(parseCsv(text));
+    currentMode = "asset";
+    currentTaskId = "";
+    currentTask = null;
+    summaryPanel.classList.add("hidden");
+    taskEditor.classList.add("hidden");
+    editor.classList.remove("hidden");
     currentNotePath = "";
     currentActivePath = path;
     notePath.textContent = path;
@@ -749,6 +1287,155 @@ async function saveNote() {
   } catch (err) {
     saveBtn.textContent = "Save";
     saveBtn.disabled = false;
+    alert(err.message);
+  }
+}
+
+function buildTaskPayloadFromForm() {
+  return {
+    title: taskTitleInput.value.trim(),
+    project: taskProjectInput.value.trim(),
+    tags: parseTagsInput(taskTagsInput.value),
+    duedate: taskDueDateInput.value,
+    priority: Number(taskPriorityInput.value) || 3,
+    completed: taskCompletedInput.checked,
+    notes: taskNotesInput.value,
+  };
+}
+
+async function openTask(id) {
+  if (!id) {
+    return;
+  }
+  try {
+    showTaskEditor();
+    const task = await apiFetch(`/tasks/${encodeURIComponent(id)}`);
+    currentTaskId = task.id;
+    currentTask = task;
+    currentActivePath = `task:${task.id}`;
+    notePath.textContent = `Task: ${task.title || "(untitled)"}`;
+    fillTaskEditor(task);
+    isDirty = false;
+    saveBtn.disabled = false;
+    setActiveNode(currentActivePath);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function saveTask() {
+  if (!currentTaskId) {
+    return;
+  }
+  const payload = buildTaskPayloadFromForm();
+  if (!payload.title) {
+    alert("Title is required.");
+    return;
+  }
+  if (payload.priority < 1 || payload.priority > 5) {
+    alert("Priority must be between 1 and 5.");
+    return;
+  }
+  try {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+    const task = await apiFetch(`/tasks/${encodeURIComponent(currentTaskId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    currentTask = task;
+    fillTaskEditor(task);
+    notePath.textContent = `Task: ${task.title || "(untitled)"}`;
+    isDirty = false;
+    saveBtn.textContent = "Save";
+    saveBtn.disabled = false;
+    await loadTree();
+  } catch (err) {
+    saveBtn.textContent = "Save";
+    saveBtn.disabled = false;
+    alert(err.message);
+  }
+}
+
+function saveCurrent() {
+  if (currentMode === "task") {
+    saveTask();
+  } else {
+    saveNote();
+  }
+}
+
+async function createTask(projectName = "") {
+  const title = promptForName("New task title");
+  if (!title) {
+    return;
+  }
+  try {
+    const task = await apiFetch("/tasks", {
+      method: "POST",
+      body: JSON.stringify({
+        title,
+        project: projectName,
+        tags: [],
+        duedate: "",
+        priority: 3,
+        completed: false,
+        notes: "",
+      }),
+    });
+    await loadTree();
+    await openTask(task.id);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function deleteTask(id) {
+  if (!id) {
+    return;
+  }
+  const confirmDelete = window.confirm("Delete this task?");
+  if (!confirmDelete) {
+    return;
+  }
+  try {
+    await apiFetch(`/tasks/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    if (currentTaskId === id) {
+      clearTaskEditor();
+    }
+    await loadTree();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function setTaskCompletion(id, completed) {
+  if (!id) {
+    return;
+  }
+  try {
+    const task = await apiFetch(`/tasks/${encodeURIComponent(id)}`);
+    const payload = {
+      title: task.title,
+      project: task.project,
+      tags: Array.isArray(task.tags) ? task.tags : [],
+      duedate: task.duedate || "",
+      priority: Number(task.priority) || 3,
+      completed,
+      notes: task.notes || "",
+    };
+    const updated = await apiFetch(`/tasks/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    if (currentTaskId === id) {
+      currentTask = updated;
+      fillTaskEditor(updated);
+    }
+    await loadTree();
+  } catch (err) {
     alert(err.message);
   }
 }
@@ -964,12 +1651,22 @@ function renderSearchResults(matches) {
   safeMatches.forEach((match) => {
     const button = document.createElement("button");
     button.type = "button";
-    const rawName = match.name || match.path.split("/").pop();
-    button.textContent = displayNodeName({ type: "file", name: rawName });
-    button.title = match.path;
+    const isTask = match.type === "task" || match.id;
+    if (isTask) {
+      button.textContent = `Task: ${match.name || "(untitled)"}`;
+      button.title = match.id || "";
+    } else {
+      const rawName = match.name || match.path.split("/").pop();
+      button.textContent = displayNodeName({ type: "file", name: rawName });
+      button.title = match.path;
+    }
     button.addEventListener("click", () => {
       hideSearchResults();
-      openNote(match.path);
+      if (isTask) {
+        openTask(match.id);
+      } else {
+        openNote(match.path);
+      }
     });
     searchResults.appendChild(button);
   });
@@ -1106,12 +1803,41 @@ function setupSplitters() {
 refreshBtn.addEventListener("click", () => loadTree());
 
 editor.addEventListener("input", () => {
+  if (currentMode !== "note") {
+    return;
+  }
   isDirty = true;
   preview.innerHTML = renderMarkdown(editor.value);
   applyHighlighting();
   renderTagBar(extractTags(editor.value));
   saveBtn.disabled = !currentNotePath;
 });
+
+function markTaskDirty() {
+  if (currentMode !== "task") {
+    return;
+  }
+  isDirty = true;
+  saveBtn.disabled = !currentTaskId;
+}
+
+[
+  taskTitleInput,
+  taskProjectInput,
+  taskTagsInput,
+  taskDueDateInput,
+  taskPriorityInput,
+  taskNotesInput,
+].forEach((input) => {
+  if (!input) {
+    return;
+  }
+  input.addEventListener("input", () => markTaskDirty());
+});
+
+if (taskCompletedInput) {
+  taskCompletedInput.addEventListener("change", () => markTaskDirty());
+}
 
 function normalizeTagInput(value) {
   const trimmed = String(value || "").trim();
@@ -1206,7 +1932,7 @@ preview.addEventListener("scroll", () => {
   syncScroll(preview, editor);
 });
 
-saveBtn.addEventListener("click", () => saveNote());
+saveBtn.addEventListener("click", () => saveCurrent());
 
 viewButtons.forEach((btn) => {
   btn.addEventListener("click", () => setView(btn.dataset.view));
@@ -1227,7 +1953,7 @@ window.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   if (key === "s" && event.shiftKey) {
     event.preventDefault();
-    saveNote();
+    saveCurrent();
     return;
   }
   if (key === "e" && event.shiftKey) {

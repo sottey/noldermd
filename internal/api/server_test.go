@@ -247,6 +247,85 @@ func TestFoldersCRUD(t *testing.T) {
 	}
 }
 
+func TestTasksCRUD(t *testing.T) {
+	dir, router := setupTestRouter(t)
+
+	rec := doRequest(t, router, http.MethodGet, "/tasks", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var list TaskListResponse
+	decodeJSONBody(t, rec, &list)
+	if list.Notice == "" {
+		t.Fatalf("expected notice when creating tasks.json")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "tasks.json")); err != nil {
+		t.Fatalf("expected tasks.json to exist")
+	}
+
+	rec = doRequest(t, router, http.MethodPost, "/tasks", map[string]any{
+		"title":     "Task One",
+		"project":   "Project A",
+		"tags":      []string{"alpha"},
+		"duedate":   "2024-03-10",
+		"priority":  2,
+		"completed": false,
+		"notes":     "hello",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", rec.Code)
+	}
+	var created Task
+	decodeJSONBody(t, rec, &created)
+	if created.ID == "" {
+		t.Fatalf("expected task id to be set")
+	}
+	if created.Title != "Task One" {
+		t.Fatalf("expected title Task One, got %q", created.Title)
+	}
+
+	rec = doRequest(t, router, http.MethodGet, "/tasks/"+created.ID, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var fetched Task
+	decodeJSONBody(t, rec, &fetched)
+	if fetched.ID != created.ID {
+		t.Fatalf("expected task id %q, got %q", created.ID, fetched.ID)
+	}
+
+	rec = doRequest(t, router, http.MethodPatch, "/tasks/"+created.ID, map[string]any{
+		"title":     "Task Updated",
+		"project":   "",
+		"tags":      []string{},
+		"duedate":   "2024-03-12",
+		"priority":  5,
+		"completed": true,
+		"notes":     "updated",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var updated Task
+	decodeJSONBody(t, rec, &updated)
+	if !updated.Completed {
+		t.Fatalf("expected task to be completed")
+	}
+	if updated.Priority != 5 {
+		t.Fatalf("expected priority 5, got %d", updated.Priority)
+	}
+
+	rec = doRequest(t, router, http.MethodDelete, "/tasks/"+created.ID, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	rec = doRequest(t, router, http.MethodGet, "/tasks/"+created.ID, nil)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rec.Code)
+	}
+}
+
 func TestSearchEndpoint(t *testing.T) {
 	dir, router := setupTestRouter(t)
 	writeFile(t, filepath.Join(dir, "alpha.md"), "hello world")
@@ -258,7 +337,7 @@ func TestSearchEndpoint(t *testing.T) {
 	}
 	var matches []SearchResult
 	decodeJSONBody(t, rec, &matches)
-	if len(matches) != 1 || matches[0].Path != "alpha.md" {
+	if len(matches) != 1 || matches[0].Path != "alpha.md" || matches[0].Type != "note" {
 		t.Fatalf("expected alpha.md match, got %#v", matches)
 	}
 
@@ -268,8 +347,33 @@ func TestSearchEndpoint(t *testing.T) {
 	}
 	matches = nil
 	decodeJSONBody(t, rec, &matches)
-	if len(matches) != 1 || matches[0].Path != "beta.md" {
+	if len(matches) != 1 || matches[0].Path != "beta.md" || matches[0].Type != "note" {
 		t.Fatalf("expected beta.md match, got %#v", matches)
+	}
+
+	rec = doRequest(t, router, http.MethodPost, "/tasks", map[string]any{
+		"title":     "Call Mom",
+		"project":   "Home",
+		"tags":      []string{"family"},
+		"duedate":   "2024-04-01",
+		"priority":  1,
+		"completed": false,
+		"notes":     "querytask",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", rec.Code)
+	}
+	var created Task
+	decodeJSONBody(t, rec, &created)
+
+	rec = doRequest(t, router, http.MethodGet, "/search?query=querytask", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	matches = nil
+	decodeJSONBody(t, rec, &matches)
+	if len(matches) != 1 || matches[0].Type != "task" || matches[0].ID != created.ID {
+		t.Fatalf("expected task match, got %#v", matches)
 	}
 }
 

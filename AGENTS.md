@@ -9,6 +9,10 @@ This file documents the current project shape and interaction model.
 ## Product behavior (high level)
 - Left sidebar shows the `Notes/` directory tree (folders + `.md` files) plus a
   tags root.
+- Left sidebar shows a `Tasks` root with project groups, a "No Project" group,
+  and a "Completed" group.
+- Clicking Notes/Tasks/Tags roots or any folder/project group shows a summary
+  panel in the main pane.
 - Main pane shows a Markdown editor, a rendered preview, or a split view with a
   draggable splitter.
 - The sidebar width is adjustable with a draggable splitter.
@@ -40,11 +44,14 @@ This file documents the current project shape and interaction model.
 - Create/rename/delete notes.
 - Provide a refresh endpoint or tree reload operation.
 - List tags extracted from note contents.
+- Read/write tasks stored in `Notes/tasks.json`.
 
 ## UI responsibilities
 - Render the folder tree and handle context menus.
 - Render the tags root and tag groups.
+- Render the tasks root and project groups.
 - Render the Markdown editor, preview, and split view with draggable splitter.
+- Render a task editor form that mirrors the note editor controls.
 - Render a tag bar in the preview pane.
 - Call API endpoints for all mutations and refresh operations.
 - Provide filename/content search with a dropdown of matches.
@@ -72,6 +79,12 @@ This file documents the current project shape and interaction model.
   - `GET /api/v1/search?query=<text>` searches note filenames + contents.
 - **Tags**:
   - `GET /api/v1/tags` returns tags with the notes that contain them.
+- **Tasks**:
+  - `GET /api/v1/tasks` returns tasks.
+  - `GET /api/v1/tasks/<id>` returns a task.
+  - `POST /api/v1/tasks` creates a task.
+  - `PATCH /api/v1/tasks/<id>` updates a task.
+  - `DELETE /api/v1/tasks/<id>` deletes a task.
 - **Health**:
   - `GET /api/v1/health` returns status.
 
@@ -81,6 +94,7 @@ This file documents the current project shape and interaction model.
 - Only `.md` files are considered notes; other files are ignored.
 - Files starting with `._` are ignored.
 - Tags match `#` followed by letters, preceded by whitespace or start of line.
+- Tasks live in `Notes/tasks.json` and use UUIDs for ids.
 
 ## Open questions to confirm
 - None currently.

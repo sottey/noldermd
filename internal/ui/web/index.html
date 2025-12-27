@@ -21,7 +21,7 @@
           </button>
         </div>
         <div class="search-row">
-          <input id="search-input" class="search-input" type="text" placeholder="Search notes" />
+          <input id="search-input" class="search-input" type="text" placeholder="Search notes and tasks" />
           <button id="search-btn" class="ghost icon-btn" title="Search" aria-label="Search">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.71.71l.27.28v.79l5 5 1.5-1.5-5-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/>
@@ -61,6 +61,54 @@
       </div>
       <section id="main-content" class="main-content">
         <div id="editor-pane" class="pane">
+          <div id="task-editor" class="task-editor hidden">
+            <div class="task-meta-row">
+              <div class="task-meta">
+                <span class="task-meta-label">Created</span>
+                <span id="task-created" class="task-meta-value"></span>
+              </div>
+              <div class="task-meta">
+                <span class="task-meta-label">Updated</span>
+                <span id="task-updated" class="task-meta-value"></span>
+              </div>
+            </div>
+            <div class="task-form">
+              <label class="task-field">
+                <span class="task-label">Title</span>
+                <input id="task-title" class="task-input" type="text" />
+              </label>
+              <label class="task-field">
+                <span class="task-label">Project</span>
+                <input id="task-project" class="task-input" type="text" />
+              </label>
+              <label class="task-field">
+                <span class="task-label">Tags</span>
+                <input id="task-tags" class="task-input" type="text" placeholder="comma separated" />
+              </label>
+              <label class="task-field">
+                <span class="task-label">Due date</span>
+                <input id="task-duedate" class="task-input" type="date" />
+              </label>
+              <label class="task-field">
+                <span class="task-label">Priority</span>
+                <select id="task-priority" class="task-input">
+                  <option value="1">1 (Highest)</option>
+                  <option value="2">2</option>
+                  <option value="3" selected>3</option>
+                  <option value="4">4</option>
+                  <option value="5">5 (Lowest)</option>
+                </select>
+              </label>
+              <label class="task-field task-field-inline">
+                <input id="task-completed" type="checkbox" />
+                <span class="task-label">Completed</span>
+              </label>
+              <label class="task-field task-field-wide">
+                <span class="task-label">Notes</span>
+                <textarea id="task-notes" class="task-textarea" spellcheck="false"></textarea>
+              </label>
+            </div>
+          </div>
           <textarea id="editor" class="editor" spellcheck="false"></textarea>
         </div>
         <div id="pane-resizer" class="resizer resizer-vertical" aria-hidden="true"></div>
@@ -69,6 +117,7 @@
           <div id="pdf-preview" class="pdf-preview hidden"></div>
           <div id="csv-preview" class="csv-preview hidden"></div>
           <div id="preview" class="preview"></div>
+          <div id="summary-panel" class="summary-panel hidden"></div>
         </div>
       </section>
     </main>

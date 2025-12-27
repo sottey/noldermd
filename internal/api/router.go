@@ -21,6 +21,11 @@ func NewRouter(notesDir string) chi.Router {
 	r.Post("/folders", s.handleCreateFolder)
 	r.Patch("/folders", s.handleRenameFolder)
 	r.Delete("/folders", s.handleDeleteFolder)
+	r.Get("/tasks", s.handleTasksList)
+	r.Post("/tasks", s.handleTasksCreate)
+	r.Get("/tasks/{id}", s.handleTasksGet)
+	r.Patch("/tasks/{id}", s.handleTasksUpdate)
+	r.Delete("/tasks/{id}", s.handleTasksDelete)
 
 	return r
 }

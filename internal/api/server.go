@@ -48,6 +48,8 @@ type FolderPayload struct {
 type SearchResult struct {
 	Path string `json:"path"`
 	Name string `json:"name"`
+	Type string `json:"type,omitempty"`
+	ID   string `json:"id,omitempty"`
 }
 
 type TagGroup struct {
@@ -361,6 +363,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			results = append(results, SearchResult{
 				Path: rel,
 				Name: d.Name(),
+				Type: "note",
 			})
 			return nil
 		}
@@ -373,6 +376,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			results = append(results, SearchResult{
 				Path: rel,
 				Name: d.Name(),
+				Type: "note",
 			})
 		}
 
@@ -381,6 +385,27 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "unable to search notes")
 		return
+	}
+
+	taskStore, _, err := s.loadTasks()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "unable to search tasks")
+		return
+	}
+	for _, task := range taskStore.Tasks {
+		title := strings.ToLower(task.Title)
+		notes := strings.ToLower(task.Notes)
+		project := strings.ToLower(task.Project)
+		if strings.Contains(title, lowerQuery) ||
+			strings.Contains(notes, lowerQuery) ||
+			strings.Contains(project, lowerQuery) ||
+			tagsContain(task.Tags, lowerQuery) {
+			results = append(results, SearchResult{
+				Name: task.Title,
+				Type: "task",
+				ID:   task.ID,
+			})
+		}
 	}
 
 	writeJSON(w, http.StatusOK, results)
@@ -769,6 +794,18 @@ func isPDF(name string) bool {
 
 func isCSV(name string) bool {
 	return strings.EqualFold(filepath.Ext(name), ".csv")
+}
+
+func tagsContain(tags []string, query string) bool {
+	if query == "" {
+		return false
+	}
+	for _, tag := range tags {
+		if strings.Contains(strings.ToLower(tag), query) {
+			return true
+		}
+	}
+	return false
 }
 
 func decodeJSON[T any](reader io.Reader) (T, error) {
