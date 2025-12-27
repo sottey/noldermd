@@ -32,6 +32,7 @@ go.work.sum
 # .vscode/
 .DS_Store
 go.sum
+data/00.Daily
 data/01.Home
 data/02.Cottage
 data/03.Coding

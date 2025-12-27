@@ -27,7 +27,7 @@ Open http://localhost:8080.
 - `GET /search?query=<text>` (searches filenames + contents)
 - `GET /tags` (tags with notes that contain them)
 - `GET /settings` (app settings)
-- `PATCH /settings` `{ "darkMode": true, "defaultView": "split", "autosaveEnabled": false, "autosaveIntervalSeconds": 30, "sidebarWidth": 300 }`
+- `PATCH /settings` `{ "darkMode": true, "defaultView": "split", "autosaveEnabled": false, "autosaveIntervalSeconds": 30, "sidebarWidth": 300, "defaultFolder": "Folder/Subfolder" }`
 - `GET /tasks` (lists tasks)
 - `GET /tasks/<id>` (fetch task)
 - `POST /tasks` `{ "title": "...", "project": "...", "tags": [], "duedate": "YYYY-MM-DD", "priority": 3, "completed": false, "notes": "..." }`
@@ -56,6 +56,7 @@ Open http://localhost:8080.
 - `defaultView` controls the initial note view (`edit`, `preview`, `split`).
 - `autosaveEnabled` and `autosaveIntervalSeconds` control note autosave.
 - `sidebarWidth` stores the sidebar width in pixels.
+- `defaultFolder` selects a folder dashboard on startup (relative to `Notes/`).
 
 ## UX behavior
 

@@ -4,5 +4,6 @@
   "defaultView": "split",
   "autosaveEnabled": true,
   "autosaveIntervalSeconds": 30,
-  "sidebarWidth": 277
+  "sidebarWidth": 277,
+  "defaultFolder": "00.Daily"
 }

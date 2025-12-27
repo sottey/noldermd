@@ -33,6 +33,7 @@ const settingsDarkMode = document.getElementById("settings-dark-mode");
 const settingsDefaultView = document.getElementById("settings-default-view");
 const settingsAutosaveEnabled = document.getElementById("settings-autosave-enabled");
 const settingsAutosaveInterval = document.getElementById("settings-autosave-interval");
+const settingsDefaultFolder = document.getElementById("settings-default-folder");
 const taskEditor = document.getElementById("task-editor");
 const taskTitleInput = document.getElementById("task-title");
 const taskProjectInput = document.getElementById("task-project");
@@ -259,7 +260,7 @@ function clearTaskEditor() {
   setActiveNode(currentActivePath);
 }
 
-function showSummary(title, items) {
+function showSummary(title, items, action) {
   currentMode = "summary";
   currentNotePath = "";
   currentTaskId = "";
@@ -285,10 +286,24 @@ function showSummary(title, items) {
   summaryPanel.classList.remove("hidden");
   setView("preview", true);
 
+  const header = document.createElement("div");
+  header.className = "summary-header";
+
   const heading = document.createElement("h2");
   heading.className = "summary-title";
   heading.textContent = title;
-  summaryPanel.appendChild(heading);
+  header.appendChild(heading);
+
+  if (action && action.label && action.handler) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "primary summary-action";
+    button.textContent = action.label;
+    button.addEventListener("click", action.handler);
+    header.appendChild(button);
+  }
+
+  summaryPanel.appendChild(header);
 
   const grid = document.createElement("div");
   grid.className = "summary-grid";
@@ -350,6 +365,26 @@ function applySidebarWidth(width) {
   currentSettings.sidebarWidth = clamped;
 }
 
+function findFolderNode(tree, path) {
+  if (!tree || !path) {
+    return null;
+  }
+  const queue = [tree];
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (!node) {
+      continue;
+    }
+    if (node.type === "folder" && node.path === path) {
+      return node;
+    }
+    if (node.children && node.children.length > 0) {
+      queue.push(...node.children);
+    }
+  }
+  return null;
+}
+
 function applySettings(settings) {
   currentSettings = {
     darkMode: !!settings.darkMode,
@@ -357,6 +392,7 @@ function applySettings(settings) {
     autosaveEnabled: !!settings.autosaveEnabled,
     autosaveIntervalSeconds: Number(settings.autosaveIntervalSeconds) || 30,
     sidebarWidth: Number(settings.sidebarWidth) || 300,
+    defaultFolder: settings.defaultFolder || "",
   };
   document.body.classList.toggle("theme-dark", currentSettings.darkMode);
   if (settingsDarkMode) {
@@ -370,6 +406,9 @@ function applySettings(settings) {
   }
   if (settingsAutosaveInterval) {
     settingsAutosaveInterval.value = String(currentSettings.autosaveIntervalSeconds);
+  }
+  if (settingsDefaultFolder) {
+    settingsDefaultFolder.value = currentSettings.defaultFolder;
   }
   applyAutosave(currentSettings);
   applySidebarWidth(currentSettings.sidebarWidth);
@@ -412,10 +451,19 @@ function showSettings() {
   if (settingsAutosaveInterval) {
     settingsAutosaveInterval.value = String(currentSettings.autosaveIntervalSeconds || 30);
   }
+  if (settingsDefaultFolder) {
+    settingsDefaultFolder.value = currentSettings.defaultFolder || "";
+  }
 }
 
 async function saveSettings() {
-  if (!settingsDarkMode || !settingsDefaultView || !settingsAutosaveEnabled || !settingsAutosaveInterval) {
+  if (
+    !settingsDarkMode ||
+    !settingsDefaultView ||
+    !settingsAutosaveEnabled ||
+    !settingsAutosaveInterval ||
+    !settingsDefaultFolder
+  ) {
     return;
   }
   try {
@@ -427,6 +475,7 @@ async function saveSettings() {
       autosaveEnabled: settingsAutosaveEnabled.checked,
       autosaveIntervalSeconds: Number(settingsAutosaveInterval.value) || 30,
       sidebarWidth: currentSettings.sidebarWidth || 300,
+      defaultFolder: settingsDefaultFolder.value.trim(),
     };
     const updated = await apiFetch("/settings", {
       method: "PATCH",
@@ -595,7 +644,10 @@ function buildTreeNode(node, depth = 0) {
         { label: "Assets", value: counts.assets },
         { label: "PDFs", value: counts.pdfs },
         { label: "CSVs", value: counts.csvs },
-      ]);
+      ], {
+        label: "New",
+        handler: () => createNote(node.path || ""),
+      });
     });
 
     row.addEventListener("contextmenu", (event) => {
@@ -830,11 +882,22 @@ function buildTaskGroup(name, tasks, depth) {
     } else if (name === "Completed") {
       title = "Completed Tasks";
     }
-    showSummary(title, [
-      { label: "Total Tasks", value: total },
-      { label: "Completed", value: completed },
-      { label: "Active", value: active },
-    ]);
+    const action =
+      name === "Completed"
+        ? null
+        : {
+            label: "New",
+            handler: () => createTask(name === "No Project" ? "" : name),
+          };
+    showSummary(
+      title,
+      [
+        { label: "Total Tasks", value: total },
+        { label: "Completed", value: completed },
+        { label: "Active", value: active },
+      ],
+      action
+    );
   });
 
   row.addEventListener("contextmenu", (event) => {
@@ -930,13 +993,17 @@ function buildTasksRoot(tasks) {
     });
     currentActivePath = "__tasks__";
     setActiveNode(currentActivePath);
-    showSummary("Tasks", [
-      { label: "Total Tasks", value: (tasks || []).length },
-      { label: "Completed", value: completedCount },
-      { label: "Active", value: (tasks || []).length - completedCount },
-      { label: "Projects", value: projectSet.size },
-      { label: "No Project", value: noProjectCount },
-    ]);
+    showSummary(
+      "Tasks",
+      [
+        { label: "Total Tasks", value: (tasks || []).length },
+        { label: "Completed", value: completedCount },
+        { label: "Active", value: (tasks || []).length - completedCount },
+        { label: "Projects", value: projectSet.size },
+        { label: "No Project", value: noProjectCount },
+      ],
+      { label: "New", handler: () => createTask("") }
+    );
   });
 
   row.addEventListener("contextmenu", (event) => {
@@ -1199,16 +1266,27 @@ async function loadTree(path = "") {
     currentTasks = tasksResponse.tasks || [];
     renderTree(currentTree, currentTags, tasksResponse.tasks || []);
     if (currentTree && currentTree.type === "folder" && currentTree.children) {
-      const counts = countTreeItems(currentTree);
-      currentActivePath = "";
+      const defaultFolder = (currentSettings.defaultFolder || "").trim();
+      const targetNode = defaultFolder ? findFolderNode(currentTree, defaultFolder) : currentTree;
+      const counts = countTreeItems(targetNode || currentTree);
+      currentActivePath = targetNode ? targetNode.path : "";
       setActiveNode(currentActivePath);
-      showSummary("Notes", [
-        { label: "Folders", value: counts.folders },
-        { label: "Notes", value: counts.notes },
-        { label: "Assets", value: counts.assets },
-        { label: "PDFs", value: counts.pdfs },
-        { label: "CSVs", value: counts.csvs },
-      ]);
+      if (targetNode && targetNode.path) {
+        expandToPath(targetNode.path);
+      }
+      const title = targetNode && targetNode.path ? `Folder: ${targetNode.name}` : "Notes";
+      const actionPath = targetNode && targetNode.path ? targetNode.path : "";
+      showSummary(
+        title,
+        [
+          { label: "Folders", value: counts.folders },
+          { label: "Notes", value: counts.notes },
+          { label: "Assets", value: counts.assets },
+          { label: "PDFs", value: counts.pdfs },
+          { label: "CSVs", value: counts.csvs },
+        ],
+        { label: "New", handler: () => createNote(actionPath) }
+      );
     }
   } catch (err) {
     alert(err.message);
@@ -2071,6 +2149,17 @@ if (settingsAutosaveInterval) {
       return;
     }
     currentSettings.autosaveIntervalSeconds = Number(settingsAutosaveInterval.value) || 30;
+    isDirty = true;
+    saveBtn.disabled = false;
+  });
+}
+
+if (settingsDefaultFolder) {
+  settingsDefaultFolder.addEventListener("input", () => {
+    if (currentMode !== "settings") {
+      return;
+    }
+    currentSettings.defaultFolder = settingsDefaultFolder.value.trim();
     isDirty = true;
     saveBtn.disabled = false;
   });

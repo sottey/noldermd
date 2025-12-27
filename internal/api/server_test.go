@@ -347,6 +347,9 @@ func TestSettingsCRUD(t *testing.T) {
 	if settingsResp.Settings.SidebarWidth != 300 {
 		t.Fatalf("expected sidebarWidth 300, got %d", settingsResp.Settings.SidebarWidth)
 	}
+	if settingsResp.Settings.DefaultFolder != "" {
+		t.Fatalf("expected defaultFolder empty, got %q", settingsResp.Settings.DefaultFolder)
+	}
 	if _, err := os.Stat(filepath.Join(dir, "settings.json")); err != nil {
 		t.Fatalf("expected settings.json to exist")
 	}
@@ -357,6 +360,7 @@ func TestSettingsCRUD(t *testing.T) {
 		"autosaveEnabled":         true,
 		"autosaveIntervalSeconds": 10,
 		"sidebarWidth":            280,
+		"defaultFolder":           "Projects",
 	})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)
@@ -378,6 +382,9 @@ func TestSettingsCRUD(t *testing.T) {
 	if updated.SidebarWidth != 280 {
 		t.Fatalf("expected sidebarWidth 280, got %d", updated.SidebarWidth)
 	}
+	if updated.DefaultFolder != "Projects" {
+		t.Fatalf("expected defaultFolder Projects, got %q", updated.DefaultFolder)
+	}
 
 	rec = doRequest(t, router, http.MethodGet, "/settings", nil)
 	if rec.Code != http.StatusOK {
@@ -396,6 +403,9 @@ func TestSettingsCRUD(t *testing.T) {
 	}
 	if settingsResp.Settings.SidebarWidth != 280 {
 		t.Fatalf("expected sidebarWidth 280 from settings")
+	}
+	if settingsResp.Settings.DefaultFolder != "Projects" {
+		t.Fatalf("expected defaultFolder Projects from settings")
 	}
 }
 

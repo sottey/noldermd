@@ -17,6 +17,7 @@ type Settings struct {
 	AutosaveEnabled         bool   `json:"autosaveEnabled"`
 	AutosaveIntervalSeconds int    `json:"autosaveIntervalSeconds"`
 	SidebarWidth            int    `json:"sidebarWidth"`
+	DefaultFolder           string `json:"defaultFolder"`
 }
 
 type SettingsResponse struct {
@@ -30,6 +31,7 @@ type SettingsPayload struct {
 	AutosaveEnabled         *bool   `json:"autosaveEnabled,omitempty"`
 	AutosaveIntervalSeconds *int    `json:"autosaveIntervalSeconds,omitempty"`
 	SidebarWidth            *int    `json:"sidebarWidth,omitempty"`
+	DefaultFolder           *string `json:"defaultFolder,omitempty"`
 }
 
 func (s *Server) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +81,9 @@ func (s *Server) handleSettingsUpdate(w http.ResponseWriter, r *http.Request) {
 	if payload.SidebarWidth != nil {
 		settings.SidebarWidth = *payload.SidebarWidth
 	}
+	if payload.DefaultFolder != nil {
+		settings.DefaultFolder = *payload.DefaultFolder
+	}
 	if err := s.saveSettings(settings); err != nil {
 		writeError(w, http.StatusInternalServerError, "unable to save settings")
 		return
@@ -103,6 +108,7 @@ func (s *Server) loadSettings() (Settings, string, error) {
 				AutosaveEnabled:         false,
 				AutosaveIntervalSeconds: 30,
 				SidebarWidth:            300,
+				DefaultFolder:           "",
 			}
 			if err := os.MkdirAll(s.notesDir, 0o755); err != nil {
 				return settings, "", err
@@ -130,6 +136,9 @@ func (s *Server) loadSettings() (Settings, string, error) {
 	}
 	if settings.SidebarWidth == 0 {
 		settings.SidebarWidth = 300
+	}
+	if settings.DefaultFolder == "." {
+		settings.DefaultFolder = ""
 	}
 
 	return settings, "", nil
@@ -160,6 +169,13 @@ func validateSettingsPayload(payload SettingsPayload) error {
 		if *payload.SidebarWidth < 220 || *payload.SidebarWidth > 600 {
 			return errors.New("sidebarWidth must be between 220 and 600")
 		}
+	}
+	if payload.DefaultFolder != nil {
+		cleaned, err := cleanRelPath(*payload.DefaultFolder)
+		if err != nil {
+			return err
+		}
+		*payload.DefaultFolder = cleaned
 	}
 	return nil
 }
