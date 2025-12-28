@@ -115,9 +115,9 @@ func TestTreeCreatesDailyNoteFromTemplate(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "settings.json"), settings, 0o644); err != nil {
 		t.Fatalf("write settings.json: %v", err)
 	}
-	templateContent := "Daily template\nLine two"
-	if err := os.WriteFile(filepath.Join(dailyDir, "daily.template"), []byte(templateContent), 0o644); err != nil {
-		t.Fatalf("write daily.template: %v", err)
+	templateContent := "Daily template\n{{date:YYYY-MM-DD}}"
+	if err := os.WriteFile(filepath.Join(dailyDir, "default.template"), []byte(templateContent), 0o644); err != nil {
+		t.Fatalf("write default.template: %v", err)
 	}
 
 	originalNow := timeNow
@@ -134,8 +134,44 @@ func TestTreeCreatesDailyNoteFromTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read daily note: %v", err)
 	}
-	if string(data) != templateContent {
+	expected := "Daily template\n2025-01-05"
+	if string(data) != expected {
 		t.Fatalf("expected daily note to match template, got %q", string(data))
+	}
+}
+
+func TestCreateNoteUsesFolderTemplate(t *testing.T) {
+	dir, router := setupTestRouter(t)
+	projectDir := filepath.Join(dir, "Project")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatalf("mkdir Project: %v", err)
+	}
+	templateContent := "Template content {{date:YYYY-MM-DD}} {{time:HH:mm}} {{datetime:YYYY-MM-DD HH:mm}} {{day:ddd}} {{year:YYYY}} {{month:YYYY-MM}} {{title}} {{path}} {{folder}}"
+	if err := os.WriteFile(filepath.Join(projectDir, "default.template"), []byte(templateContent), 0o644); err != nil {
+		t.Fatalf("write default.template: %v", err)
+	}
+
+	originalNow := timeNow
+	timeNow = func() time.Time { return time.Date(2025, 2, 10, 9, 5, 6, 0, time.Local) }
+	t.Cleanup(func() { timeNow = originalNow })
+
+	payload := map[string]string{
+		"path":    "Project/Custom",
+		"content": "User content",
+	}
+	rec := doRequest(t, router, http.MethodPost, "/notes", payload)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", rec.Code)
+	}
+
+	notePath := filepath.Join(projectDir, "Custom.md")
+	data, err := os.ReadFile(notePath)
+	if err != nil {
+		t.Fatalf("read note: %v", err)
+	}
+	expected := "Template content 2025-02-10 09:05 2025-02-10 09:05 Mon 2025 2025-02 Custom Project/Custom.md Project"
+	if string(data) != expected {
+		t.Fatalf("expected note to match template, got %q", string(data))
 	}
 }
 

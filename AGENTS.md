@@ -103,6 +103,21 @@ This file documents the current project shape and interaction model.
 - Tags match `#` followed by letters, preceded by whitespace or start of line.
 - Tasks live in `Notes/tasks.json` and use UUIDs for ids.
 - Settings live in `Notes/settings.json`.
+- If a folder contains `default.template`, new notes created in that folder use
+  the template contents.
+
+## Templates
+- `default.template` in a folder provides the initial content for new notes
+  created in that folder.
+- Example: `Notes/00.Daily/default.template` applies to new notes under
+  `00.Daily/`.
+- Templates can include placeholders that are replaced when the note is created:
+  `{{date:YYYY-MM-DD}}`, `{{time:HH:mm}}`, `{{datetime:YYYY-MM-DD HH:mm}}`,
+  `{{day:ddd}}` or `{{day:dddd}}`, `{{year:YYYY}}`, `{{month:YYYY-MM}}`,
+  `{{title}}`, `{{path}}`, `{{folder}}`. All date/time values use server-local
+  time.
+- Date/time placeholders must include the token name (for example,
+  `{{date:YYYY-MM-DD}}`, not `{{YYYY-MM-DD}}`).
 
 ## Open questions to confirm
 - None currently.

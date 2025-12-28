@@ -19,6 +19,12 @@ type Server struct {
 
 var timeNow = time.Now
 
+type TemplateContext struct {
+	Title  string
+	Path   string
+	Folder string
+}
+
 type TreeNode struct {
 	Name     string     `json:"name"`
 	Path     string     `json:"path"`
@@ -181,12 +187,22 @@ func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := os.WriteFile(absPath, []byte(payload.Content), 0o644); err != nil {
+	content := payload.Content
+	templateContent, ok, err := s.folderTemplateContent(filepath.Dir(absPath))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "unable to load folder template")
+		return
+	}
+	if ok {
+		content = applyTemplatePlaceholders(string(templateContent), timeNow(), templateContext(relPath))
+	}
+
+	if err := os.WriteFile(absPath, []byte(content), 0o644); err != nil {
 		writeError(w, http.StatusInternalServerError, "unable to create note")
 		return
 	}
 
-	if err := s.syncTasksFromNote(relPath, payload.Content); err != nil {
+	if err := s.syncTasksFromNote(relPath, content); err != nil {
 		writeError(w, http.StatusInternalServerError, "unable to sync tasks from note")
 		return
 	}
@@ -794,12 +810,115 @@ func (s *Server) ensureDailyNote() error {
 		return err
 	}
 
-	templatePath := filepath.Join(dailyDir, "daily.template")
-	content, err := os.ReadFile(templatePath)
-	if err != nil && !os.IsNotExist(err) {
+	content, ok, err := s.folderTemplateContent(dailyDir)
+	if err != nil {
 		return err
 	}
-	return os.WriteFile(notePath, content, 0o644)
+	if !ok {
+		content = nil
+	}
+	finalContent := string(content)
+	if ok {
+		relPath := filepath.ToSlash(filepath.Join(cleaned, today+".md"))
+		finalContent = applyTemplatePlaceholders(finalContent, timeNow(), templateContext(relPath))
+	}
+	return os.WriteFile(notePath, []byte(finalContent), 0o644)
+}
+
+func (s *Server) folderTemplateContent(dir string) ([]byte, bool, error) {
+	templatePath := filepath.Join(dir, "default.template")
+	content, err := os.ReadFile(templatePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return content, true, nil
+}
+
+func applyTemplatePlaceholders(input string, now time.Time, ctx TemplateContext) string {
+	const tokenPrefix = "{{"
+	const tokenSuffix = "}}"
+	start := strings.Index(input, tokenPrefix)
+	if start == -1 {
+		return input
+	}
+
+	var out strings.Builder
+	out.Grow(len(input))
+	remaining := input
+	for {
+		start = strings.Index(remaining, tokenPrefix)
+		if start == -1 {
+			out.WriteString(remaining)
+			break
+		}
+		out.WriteString(remaining[:start])
+		remaining = remaining[start+len(tokenPrefix):]
+		end := strings.Index(remaining, tokenSuffix)
+		if end == -1 {
+			out.WriteString(tokenPrefix)
+			out.WriteString(remaining)
+			break
+		}
+		token := remaining[:end]
+		out.WriteString(resolveTemplateToken(token, now, ctx))
+		remaining = remaining[end+len(tokenSuffix):]
+	}
+	return out.String()
+}
+
+func resolveTemplateToken(token string, now time.Time, ctx TemplateContext) string {
+	if token == "title" {
+		return ctx.Title
+	}
+	if token == "path" {
+		return ctx.Path
+	}
+	if token == "folder" {
+		return ctx.Folder
+	}
+	parts := strings.SplitN(token, ":", 2)
+	if len(parts) != 2 {
+		return "{{" + token + "}}"
+	}
+	key := parts[0]
+	format := parts[1]
+	layout := layoutFromTemplate(format)
+	switch key {
+	case "date", "time", "datetime", "day", "year", "month":
+		return now.Format(layout)
+	default:
+		return "{{" + token + "}}"
+	}
+}
+
+func layoutFromTemplate(format string) string {
+	replacer := strings.NewReplacer(
+		"YYYY", "2006",
+		"MM", "01",
+		"DD", "02",
+		"HH", "15",
+		"mm", "04",
+		"ss", "05",
+		"dddd", "Monday",
+		"ddd", "Mon",
+	)
+	return replacer.Replace(format)
+}
+
+func templateContext(relPath string) TemplateContext {
+	path := filepath.ToSlash(relPath)
+	folder := filepath.ToSlash(filepath.Dir(relPath))
+	if folder == "." {
+		folder = ""
+	}
+	return TemplateContext{
+		Title:  strings.TrimSuffix(filepath.Base(relPath), filepath.Ext(relPath)),
+		Path:   path,
+		Folder: folder,
+	}
 }
 
 func cleanRelPath(input string) (string, error) {

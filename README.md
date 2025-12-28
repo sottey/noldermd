@@ -41,6 +41,22 @@ Open http://localhost:8080.
 - Files starting with `._` are ignored.
 - Tree responses return metadata only.
 - Tags match `#` followed by letters, preceded by whitespace or start of line.
+- If a folder contains `default.template`, new notes created in that folder use
+  the template contents.
+
+## Templates
+
+- `default.template` in a folder provides the initial content for new notes
+  created in that folder.
+- Example: `Notes/00.Daily/default.template` applies to new notes under
+  `00.Daily/`.
+- Templates can include placeholders that are replaced when the note is created:
+  `{{date:YYYY-MM-DD}}`, `{{time:HH:mm}}`, `{{datetime:YYYY-MM-DD HH:mm}}`,
+  `{{day:ddd}}` or `{{day:dddd}}`, `{{year:YYYY}}`, `{{month:YYYY-MM}}`,
+  `{{title}}`, `{{path}}`, `{{folder}}`. All date/time values use server-local
+  time.
+- Date/time placeholders must include the token name (for example,
+  `{{date:YYYY-MM-DD}}`, not `{{YYYY-MM-DD}}`).
 
 ## Tasks rules
 
