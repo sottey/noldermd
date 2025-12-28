@@ -172,7 +172,12 @@ func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pathParam := ensureMarkdown(strings.TrimSpace(payload.Path))
+	pathParam := strings.TrimSpace(payload.Path)
+	if isTemplate(pathParam) {
+		pathParam = ensureTemplate(pathParam)
+	} else {
+		pathParam = ensureMarkdown(pathParam)
+	}
 	absPath, relPath, err := s.resolvePath(pathParam)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())

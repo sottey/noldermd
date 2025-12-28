@@ -687,6 +687,10 @@ function buildTreeNode(node, depth = 0) {
           action: () => createNote(node.path),
         },
         {
+          label: "Edit Template",
+          action: () => editTemplate(node.path),
+        },
+        {
           label: "Rename",
           action: () => renameFolder(node.path),
         },
@@ -792,7 +796,9 @@ function countTreeItems(node) {
         }
         break;
       case "file":
-        counts.notes += 1;
+        if (!(current.name || "").toLowerCase().endsWith(".template")) {
+          counts.notes += 1;
+        }
         break;
       case "asset":
         counts.assets += 1;
@@ -1782,6 +1788,28 @@ async function createNote(parentPath = "") {
     await loadTree();
     await openNote(data.path);
   } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function editTemplate(parentPath = "") {
+  const templateName = "default.template";
+  const path = parentPath ? `${parentPath}/${templateName}` : templateName;
+  try {
+    const data = await apiFetch("/notes", {
+      method: "POST",
+      body: JSON.stringify({
+        path,
+        content: "",
+      }),
+    });
+    await loadTree();
+    await openNote(data.path);
+  } catch (err) {
+    if (String(err.message || "").toLowerCase().includes("already exists")) {
+      await openNote(path);
+      return;
+    }
     alert(err.message);
   }
 }

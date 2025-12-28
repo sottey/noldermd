@@ -111,11 +111,13 @@ can create notes and templates inside the mounted `/notes` folder.
 - Settings button sits beside refresh in the sidebar header and opens a settings form.
 - Settings include dark mode, default view, and autosave options.
 - Settings include a Show Templates toggle for `.template` files.
+- Settings are grouped into Display, Autosave, and Folders sections.
 - Preview pane shows a sticky tag bar with clickable tag pills.
 - Context menus:
-  - Folder: New Folder, New Note, Rename, Delete, Expand/Collapse.
+  - Folder: New Folder, New Note, Edit Template, Rename, Delete, Expand/Collapse.
   - Note: New Note, Rename, Delete.
   - Sidebar empty area: New Folder, New Note.
+  - Edit Template creates `default.template` if missing and opens it for editing.
 - Refresh button reloads the tree.
 - Search input lists matching notes and tasks; selecting one opens it.
 - Editor and preview scroll independently from the sidebar.

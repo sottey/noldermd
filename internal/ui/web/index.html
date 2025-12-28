@@ -118,43 +118,65 @@
           </div>
           <div id="settings-panel" class="settings-panel hidden">
             <h2 class="settings-title">Settings</h2>
-            <div class="settings-grid">
-              <label class="settings-row">
-                <input id="settings-dark-mode" type="checkbox" />
-                <span>Dark Mode</span>
-              </label>
-              <label class="settings-field">
-                <span class="settings-label">Default View</span>
-                <select id="settings-default-view" class="settings-input">
-                  <option value="edit">Edit</option>
-                  <option value="preview">Preview</option>
-                  <option value="split">Split</option>
-                </select>
-              </label>
-              <label class="settings-row">
-                <input id="settings-autosave-enabled" type="checkbox" />
-                <span>Autosave Notes</span>
-              </label>
-              <label class="settings-row">
-                <input id="settings-show-templates" type="checkbox" />
-                <span>Show Templates</span>
-              </label>
-              <label class="settings-field">
-                <span class="settings-label">Autosave Interval</span>
-                <select id="settings-autosave-interval" class="settings-input">
-                  <option value="10">10 seconds</option>
-                  <option value="30">30 seconds</option>
-                  <option value="60">60 seconds</option>
-                </select>
-              </label>
-              <label class="settings-field">
-                <span class="settings-label">Default Folder</span>
-                <input id="settings-default-folder" class="settings-input" type="text" placeholder="Folder/Subfolder" />
-              </label>
-              <label class="settings-field">
-                <span class="settings-label">Daily Folder</span>
-                <input id="settings-daily-folder" class="settings-input" type="text" placeholder="Folder/Subfolder" />
-              </label>
+            <div class="settings-section">
+              <div class="settings-section-header">
+                <h3 class="settings-section-title">Display</h3>
+                <p class="settings-section-desc">Theme and editor defaults.</p>
+              </div>
+              <div class="settings-grid">
+                <label class="settings-row">
+                  <input id="settings-dark-mode" type="checkbox" />
+                  <span>Dark Mode</span>
+                </label>
+                <label class="settings-row">
+                  <input id="settings-show-templates" type="checkbox" />
+                  <span>Show Templates</span>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Default View</span>
+                  <select id="settings-default-view" class="settings-input">
+                    <option value="edit">Edit</option>
+                    <option value="preview">Preview</option>
+                    <option value="split">Split</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="settings-section">
+              <div class="settings-section-header">
+                <h3 class="settings-section-title">Autosave</h3>
+                <p class="settings-section-desc">Control autosave timing.</p>
+              </div>
+              <div class="settings-grid">
+                <label class="settings-row">
+                  <input id="settings-autosave-enabled" type="checkbox" />
+                  <span>Autosave Notes</span>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Autosave Interval</span>
+                  <select id="settings-autosave-interval" class="settings-input">
+                    <option value="10">10 seconds</option>
+                    <option value="30">30 seconds</option>
+                    <option value="60">60 seconds</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="settings-section">
+              <div class="settings-section-header">
+                <h3 class="settings-section-title">Folders</h3>
+                <p class="settings-section-desc">Startup and daily note targets.</p>
+              </div>
+              <div class="settings-grid">
+                <label class="settings-field">
+                  <span class="settings-label">Default Folder</span>
+                  <input id="settings-default-folder" class="settings-input" type="text" placeholder="Folder/Subfolder" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Daily Folder</span>
+                  <input id="settings-daily-folder" class="settings-input" type="text" placeholder="Folder/Subfolder" />
+                </label>
+              </div>
             </div>
           </div>
           <textarea id="editor" class="editor" spellcheck="false"></textarea>

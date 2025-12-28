@@ -19,9 +19,10 @@ This file documents the current project shape and interaction model.
 - The sidebar width is adjustable with a draggable splitter.
 - A view selector in the top-right provides edit, preview, and split modes.
 - Context menus:
-  - Right-click on a folder: New Folder, New Note, Rename, Delete, Expand/Collapse.
+  - Right-click on a folder: New Folder, New Note, Edit Template, Rename, Delete, Expand/Collapse.
   - Right-click on a note: New Note, Rename, Delete.
   - Right-click empty area in sidebar: New Folder, New Note.
+  - Edit Template creates `default.template` if missing and opens it for editing.
 - A Refresh button reloads the tree view.
 - Tags are aggregated into a "Tags" root, collapsed by default, and refreshed
   when the tree reloads.
@@ -54,7 +55,8 @@ This file documents the current project shape and interaction model.
 - Render the tasks root and project groups.
 - Render the Markdown editor, preview, and split view with draggable splitter.
 - Render a task editor form that mirrors the note editor controls.
-- Render a settings form (dark mode, default view, autosave, sidebar width, default folder, daily folder, show templates).
+- Render a settings form with sections for Display (dark mode, default view, show templates),
+  Autosave (autosave, interval), and Folders (default folder, daily folder).
 - Ensure tag labels remain legible in dark mode.
 - Render a tag bar in the preview pane.
 - Call API endpoints for all mutations and refresh operations.

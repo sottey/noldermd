@@ -165,6 +165,27 @@ func TestTreeShowTemplatesSetting(t *testing.T) {
 	}
 }
 
+func TestCreateTemplateNote(t *testing.T) {
+	dir, router := setupTestRouter(t)
+	payload := map[string]string{
+		"path":    "Templates/default.template",
+		"content": "Template content",
+	}
+	rec := doRequest(t, router, http.MethodPost, "/notes", payload)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", rec.Code)
+	}
+
+	templatePath := filepath.Join(dir, "Templates", "default.template")
+	data, err := os.ReadFile(templatePath)
+	if err != nil {
+		t.Fatalf("read template: %v", err)
+	}
+	if string(data) != "Template content" {
+		t.Fatalf("expected template content, got %q", string(data))
+	}
+}
+
 func TestTreeCreatesDailyNoteFromTemplate(t *testing.T) {
 	dir, router := setupTestRouter(t)
 	dailyDir := filepath.Join(dir, "Daily")
