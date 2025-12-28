@@ -11,6 +11,27 @@ go run ./cmd/noldermd serve --notes-dir ./Notes --port 8080
 
 Open http://localhost:8080.
 
+## Docker Compose
+
+1) Use git to clone the repo
+2) Docker build -t noldermd:local .
+3) Use the compose file below to run the app
+
+```yaml
+services:
+  noldermd:
+    image: sottey/noldermd:local
+    ports:
+      - 8083:8080
+    user: "1000:1000"
+    volumes:
+      - /path/to/notes/folder:/notes
+networks: {}
+```
+
+The `user` entry keeps file ownership aligned with your host user so the app
+can create notes and templates inside the mounted `/notes` folder.
+
 ## API (base: `/api/v1`)
 
 - `GET /health`

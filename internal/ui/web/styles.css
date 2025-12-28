@@ -758,6 +758,72 @@ body.theme-dark .preview pre {
   border-radius: 6px;
 }
 
+body.theme-dark .preview code {
+  background: rgba(148, 163, 184, 0.2);
+  color: #e2e8f0;
+}
+
+.preview pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+body.theme-dark .hljs {
+  color: #e2e8f0;
+  background: #0b1220;
+}
+
+body.theme-dark .hljs-comment,
+body.theme-dark .hljs-quote {
+  color: #94a3b8;
+}
+
+body.theme-dark .hljs-keyword,
+body.theme-dark .hljs-selector-tag,
+body.theme-dark .hljs-subst {
+  color: #7dd3fc;
+}
+
+body.theme-dark .hljs-literal,
+body.theme-dark .hljs-number,
+body.theme-dark .hljs-tag .hljs-attr,
+body.theme-dark .hljs-template-variable,
+body.theme-dark .hljs-variable {
+  color: #fbbf24;
+}
+
+body.theme-dark .hljs-string,
+body.theme-dark .hljs-doctag {
+  color: #a7f3d0;
+}
+
+body.theme-dark .hljs-title,
+body.theme-dark .hljs-section,
+body.theme-dark .hljs-name {
+  color: #c4b5fd;
+}
+
+body.theme-dark .hljs-attribute,
+body.theme-dark .hljs-attr {
+  color: #fca5a5;
+}
+
+body.theme-dark .hljs-built_in,
+body.theme-dark .hljs-type {
+  color: #93c5fd;
+}
+
+body.theme-dark .hljs-addition {
+  color: #86efac;
+  background-color: rgba(22, 101, 52, 0.3);
+}
+
+body.theme-dark .hljs-deletion {
+  color: #fda4af;
+  background-color: rgba(159, 18, 57, 0.3);
+}
+
 .preview table {
   width: 100%;
   border-collapse: collapse;
