@@ -105,6 +105,66 @@ func TestTreeEndpoint(t *testing.T) {
 	}
 }
 
+func TestTreeShowTemplatesSetting(t *testing.T) {
+	dir, router := setupTestRouter(t)
+	writeFile(t, filepath.Join(dir, "Templates", "default.template"), "Template")
+
+	settings := []byte(`{"version":2,"showTemplates":true}`)
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), settings, 0o644); err != nil {
+		t.Fatalf("write settings.json: %v", err)
+	}
+
+	rec := doRequest(t, router, http.MethodGet, "/tree", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var tree TreeNode
+	decodeJSONBody(t, rec, &tree)
+
+	foundTemplate := false
+	var visit func(node TreeNode)
+	visit = func(node TreeNode) {
+		if node.Path == "Templates/default.template" {
+			foundTemplate = true
+			return
+		}
+		for _, child := range node.Children {
+			visit(child)
+		}
+	}
+	visit(tree)
+	if !foundTemplate {
+		t.Fatalf("expected template to be present in tree")
+	}
+
+	settings = []byte(`{"version":2,"showTemplates":false}`)
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), settings, 0o644); err != nil {
+		t.Fatalf("write settings.json: %v", err)
+	}
+
+	rec = doRequest(t, router, http.MethodGet, "/tree", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var hiddenTree TreeNode
+	decodeJSONBody(t, rec, &hiddenTree)
+
+	foundTemplate = false
+	visit = func(node TreeNode) {
+		if node.Path == "Templates/default.template" {
+			foundTemplate = true
+			return
+		}
+		for _, child := range node.Children {
+			visit(child)
+		}
+	}
+	visit(hiddenTree)
+	if foundTemplate {
+		t.Fatalf("expected template to be hidden in tree")
+	}
+}
+
 func TestTreeCreatesDailyNoteFromTemplate(t *testing.T) {
 	dir, router := setupTestRouter(t)
 	dailyDir := filepath.Join(dir, "Daily")

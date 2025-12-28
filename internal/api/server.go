@@ -74,6 +74,11 @@ func (s *Server) handleTree(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "unable to ensure daily note")
 		return
 	}
+	settings, _, err := s.loadSettings()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "unable to load settings")
+		return
+	}
 	pathParam := r.URL.Query().Get("path")
 	absPath, relPath, err := s.resolvePath(pathParam)
 	if err != nil {
@@ -101,7 +106,7 @@ func (s *Server) handleTree(w http.ResponseWriter, r *http.Request) {
 		Type: "folder",
 	}
 
-	children, err := s.buildTree(absPath, relPath)
+	children, err := s.buildTree(absPath, relPath, settings.ShowTemplates)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "unable to build tree")
 		return
@@ -137,8 +142,8 @@ func (s *Server) handleGetNote(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "path is a folder")
 		return
 	}
-	if !isMarkdown(absPath) {
-		writeError(w, http.StatusBadRequest, "not a markdown file")
+	if !isNoteFile(absPath) {
+		writeError(w, http.StatusBadRequest, "not a note file")
 		return
 	}
 
@@ -240,8 +245,8 @@ func (s *Server) handleUpdateNote(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "path is a folder")
 		return
 	}
-	if !isMarkdown(absPath) {
-		writeError(w, http.StatusBadRequest, "not a markdown file")
+	if !isNoteFile(absPath) {
+		writeError(w, http.StatusBadRequest, "not a note file")
 		return
 	}
 
@@ -250,9 +255,11 @@ func (s *Server) handleUpdateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.syncTasksFromNote(relPath, payload.Content); err != nil {
-		writeError(w, http.StatusInternalServerError, "unable to sync tasks from note")
-		return
+	if isMarkdown(absPath) {
+		if err := s.syncTasksFromNote(relPath, payload.Content); err != nil {
+			writeError(w, http.StatusInternalServerError, "unable to sync tasks from note")
+			return
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"path": relPath})
@@ -284,8 +291,8 @@ func (s *Server) handleDeleteNote(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "path is a folder")
 		return
 	}
-	if !isMarkdown(absPath) {
-		writeError(w, http.StatusBadRequest, "not a markdown file")
+	if !isNoteFile(absPath) {
+		writeError(w, http.StatusBadRequest, "not a note file")
 		return
 	}
 
@@ -539,11 +546,6 @@ func (s *Server) handleRenameNote(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	absNewPath, relNewPath, err := s.resolvePath(ensureMarkdown(payload.NewPath))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
 
 	info, err := os.Stat(absPath)
 	if err != nil {
@@ -558,8 +560,20 @@ func (s *Server) handleRenameNote(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "path is a folder")
 		return
 	}
-	if !isMarkdown(absPath) {
-		writeError(w, http.StatusBadRequest, "not a markdown file")
+	if !isNoteFile(absPath) {
+		writeError(w, http.StatusBadRequest, "not a note file")
+		return
+	}
+
+	newPathInput := strings.TrimSpace(payload.NewPath)
+	if isTemplate(absPath) {
+		newPathInput = ensureTemplate(newPathInput)
+	} else {
+		newPathInput = ensureMarkdown(newPathInput)
+	}
+	absNewPath, relNewPath, err := s.resolvePath(newPathInput)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -676,7 +690,7 @@ func (s *Server) handleDeleteFolder(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
-func (s *Server) buildTree(absPath, relPath string) ([]TreeNode, error) {
+func (s *Server) buildTree(absPath, relPath string, showTemplates bool) ([]TreeNode, error) {
 	entries, err := os.ReadDir(absPath)
 	if err != nil {
 		return nil, err
@@ -689,7 +703,7 @@ func (s *Server) buildTree(absPath, relPath string) ([]TreeNode, error) {
 		childAbs := filepath.Join(absPath, name)
 
 		if entry.IsDir() {
-			children, err := s.buildTree(childAbs, childRel)
+			children, err := s.buildTree(childAbs, childRel, showTemplates)
 			if err != nil {
 				return nil, err
 			}
@@ -707,6 +721,14 @@ func (s *Server) buildTree(absPath, relPath string) ([]TreeNode, error) {
 		}
 
 		if !isMarkdown(name) {
+			if showTemplates && isTemplate(name) {
+				nodes = append(nodes, TreeNode{
+					Name: name,
+					Path: filepath.ToSlash(childRel),
+					Type: "file",
+				})
+				continue
+			}
 			if isImage(name) {
 				nodes = append(nodes, TreeNode{
 					Name: name,
@@ -947,8 +969,23 @@ func ensureMarkdown(path string) string {
 	return path + ".md"
 }
 
+func ensureTemplate(path string) string {
+	if isTemplate(path) {
+		return path
+	}
+	return path + ".template"
+}
+
 func isMarkdown(name string) bool {
 	return strings.HasSuffix(strings.ToLower(name), ".md")
+}
+
+func isTemplate(name string) bool {
+	return strings.HasSuffix(strings.ToLower(name), ".template")
+}
+
+func isNoteFile(name string) bool {
+	return isMarkdown(name) || isTemplate(name)
 }
 
 func isIgnoredFile(name string) bool {

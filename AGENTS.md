@@ -54,7 +54,7 @@ This file documents the current project shape and interaction model.
 - Render the tasks root and project groups.
 - Render the Markdown editor, preview, and split view with draggable splitter.
 - Render a task editor form that mirrors the note editor controls.
-- Render a settings form (dark mode, default view, autosave, sidebar width, default folder, daily folder).
+- Render a settings form (dark mode, default view, autosave, sidebar width, default folder, daily folder, show templates).
 - Ensure tag labels remain legible in dark mode.
 - Render a tag bar in the preview pane.
 - Call API endpoints for all mutations and refresh operations.

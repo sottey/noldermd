@@ -19,6 +19,7 @@ type Settings struct {
 	SidebarWidth            int    `json:"sidebarWidth"`
 	DefaultFolder           string `json:"defaultFolder"`
 	DailyFolder             string `json:"dailyFolder"`
+	ShowTemplates           bool   `json:"showTemplates"`
 }
 
 type SettingsResponse struct {
@@ -34,6 +35,7 @@ type SettingsPayload struct {
 	SidebarWidth            *int    `json:"sidebarWidth,omitempty"`
 	DefaultFolder           *string `json:"defaultFolder,omitempty"`
 	DailyFolder             *string `json:"dailyFolder,omitempty"`
+	ShowTemplates           *bool   `json:"showTemplates,omitempty"`
 }
 
 func (s *Server) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
@@ -89,6 +91,9 @@ func (s *Server) handleSettingsUpdate(w http.ResponseWriter, r *http.Request) {
 	if payload.DailyFolder != nil {
 		settings.DailyFolder = *payload.DailyFolder
 	}
+	if payload.ShowTemplates != nil {
+		settings.ShowTemplates = *payload.ShowTemplates
+	}
 	if err := s.saveSettings(settings); err != nil {
 		writeError(w, http.StatusInternalServerError, "unable to save settings")
 		return
@@ -107,7 +112,7 @@ func (s *Server) loadSettings() (Settings, string, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			settings := Settings{
-				Version:                 1,
+				Version:                 2,
 				DarkMode:                false,
 				DefaultView:             "split",
 			AutosaveEnabled:         false,
@@ -115,6 +120,7 @@ func (s *Server) loadSettings() (Settings, string, error) {
 			SidebarWidth:            300,
 			DefaultFolder:           "",
 			DailyFolder:             "",
+			ShowTemplates:           true,
 		}
 		if err := os.MkdirAll(s.notesDir, 0o755); err != nil {
 			return settings, "", err
@@ -132,7 +138,7 @@ func (s *Server) loadSettings() (Settings, string, error) {
 		return Settings{}, "", err
 	}
 	if settings.Version == 0 {
-		settings.Version = 1
+		settings.Version = 2
 	}
 	if settings.DefaultView == "" {
 		settings.DefaultView = "split"
@@ -148,6 +154,10 @@ func (s *Server) loadSettings() (Settings, string, error) {
 	}
 	if settings.DailyFolder == "." {
 		settings.DailyFolder = ""
+	}
+	if settings.Version < 2 {
+		settings.ShowTemplates = true
+		settings.Version = 2
 	}
 
 	return settings, "", nil

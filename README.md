@@ -48,7 +48,7 @@ can create notes and templates inside the mounted `/notes` folder.
 - `GET /search?query=<text>` (searches filenames + contents)
 - `GET /tags` (tags with notes that contain them)
 - `GET /settings` (app settings)
-- `PATCH /settings` `{ "darkMode": true, "defaultView": "split", "autosaveEnabled": false, "autosaveIntervalSeconds": 30, "sidebarWidth": 300, "defaultFolder": "Folder/Subfolder", "dailyFolder": "Folder/Subfolder" }`
+- `PATCH /settings` `{ "darkMode": true, "defaultView": "split", "autosaveEnabled": false, "autosaveIntervalSeconds": 30, "sidebarWidth": 300, "defaultFolder": "Folder/Subfolder", "dailyFolder": "Folder/Subfolder", "showTemplates": true }`
 - `GET /tasks` (lists tasks)
 - `GET /tasks/<id>` (fetch task)
 - `POST /tasks` `{ "title": "...", "project": "...", "tags": [], "duedate": "YYYY-MM-DD", "priority": 3, "completed": false, "notes": "..." }`
@@ -95,6 +95,7 @@ can create notes and templates inside the mounted `/notes` folder.
 - `sidebarWidth` stores the sidebar width in pixels.
 - `defaultFolder` selects a folder dashboard on startup (relative to `Notes/`).
 - `dailyFolder` opts into auto-creating a dated note in that folder on startup.
+- `showTemplates` toggles visibility of `.template` files in the sidebar.
 
 ## UX behavior
 
@@ -109,6 +110,7 @@ can create notes and templates inside the mounted `/notes` folder.
 - View selector (top right) toggles edit/preview/split.
 - Settings button sits beside refresh in the sidebar header and opens a settings form.
 - Settings include dark mode, default view, and autosave options.
+- Settings include a Show Templates toggle for `.template` files.
 - Preview pane shows a sticky tag bar with clickable tag pills.
 - Context menus:
   - Folder: New Folder, New Note, Rename, Delete, Expand/Collapse.

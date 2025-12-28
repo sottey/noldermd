@@ -35,6 +35,7 @@ const settingsAutosaveEnabled = document.getElementById("settings-autosave-enabl
 const settingsAutosaveInterval = document.getElementById("settings-autosave-interval");
 const settingsDefaultFolder = document.getElementById("settings-default-folder");
 const settingsDailyFolder = document.getElementById("settings-daily-folder");
+const settingsShowTemplates = document.getElementById("settings-show-templates");
 const taskEditor = document.getElementById("task-editor");
 const taskTitleInput = document.getElementById("task-title");
 const taskProjectInput = document.getElementById("task-project");
@@ -395,6 +396,7 @@ function applySettings(settings) {
     sidebarWidth: Number(settings.sidebarWidth) || 300,
     defaultFolder: settings.defaultFolder || "",
     dailyFolder: settings.dailyFolder || "",
+    showTemplates: settings.showTemplates !== false,
   };
   document.body.classList.toggle("theme-dark", currentSettings.darkMode);
   if (settingsDarkMode) {
@@ -414,6 +416,9 @@ function applySettings(settings) {
   }
   if (settingsDailyFolder) {
     settingsDailyFolder.value = currentSettings.dailyFolder;
+  }
+  if (settingsShowTemplates) {
+    settingsShowTemplates.checked = currentSettings.showTemplates;
   }
   applyAutosave(currentSettings);
   applySidebarWidth(currentSettings.sidebarWidth);
@@ -462,6 +467,9 @@ function showSettings() {
   if (settingsDailyFolder) {
     settingsDailyFolder.value = currentSettings.dailyFolder || "";
   }
+  if (settingsShowTemplates) {
+    settingsShowTemplates.checked = currentSettings.showTemplates;
+  }
 }
 
 async function saveSettings() {
@@ -471,13 +479,15 @@ async function saveSettings() {
     !settingsAutosaveEnabled ||
     !settingsAutosaveInterval ||
     !settingsDefaultFolder ||
-    !settingsDailyFolder
+    !settingsDailyFolder ||
+    !settingsShowTemplates
   ) {
     return;
   }
   try {
     saveBtn.disabled = true;
     saveBtn.textContent = "Saving...";
+    const previousShowTemplates = currentSettings.showTemplates;
     const payload = {
       darkMode: settingsDarkMode.checked,
       defaultView: settingsDefaultView.value,
@@ -486,12 +496,16 @@ async function saveSettings() {
       sidebarWidth: currentSettings.sidebarWidth || 300,
       defaultFolder: settingsDefaultFolder.value.trim(),
       dailyFolder: settingsDailyFolder.value.trim(),
+      showTemplates: settingsShowTemplates.checked,
     };
     const updated = await apiFetch("/settings", {
       method: "PATCH",
       body: JSON.stringify(payload),
     });
     applySettings(updated);
+    if (previousShowTemplates !== updated.showTemplates) {
+      await loadTree();
+    }
     isDirty = false;
     saveBtn.textContent = "Save";
     saveBtn.disabled = false;
@@ -1744,6 +1758,13 @@ function ensureMarkdownName(name) {
   return `${name}.md`;
 }
 
+function ensureTemplateName(name) {
+  if (name.toLowerCase().endsWith(".template")) {
+    return name;
+  }
+  return `${name}.template`;
+}
+
 async function createNote(parentPath = "") {
   const name = promptForName("New note name");
   if (!name) {
@@ -1770,13 +1791,16 @@ async function renameNote(path) {
     return;
   }
   const currentName = path.split("/").pop() || "";
-  const displayName = displayNodeName({ type: "file", name: currentName });
+  const isTemplate = currentName.toLowerCase().endsWith(".template");
+  const displayName = isTemplate
+    ? currentName
+    : displayNodeName({ type: "file", name: currentName });
   const name = promptForNameWithDefault(`Rename note (${displayName})`, displayName);
   if (!name) {
     return;
   }
   const base = path.split("/").slice(0, -1).join("/");
-  const newName = ensureMarkdownName(name);
+  const newName = isTemplate ? ensureTemplateName(name) : ensureMarkdownName(name);
   const newPath = base ? `${base}/${newName}` : newName;
   try {
     const data = await apiFetch("/notes/rename", {
@@ -2181,6 +2205,17 @@ if (settingsDailyFolder) {
       return;
     }
     currentSettings.dailyFolder = settingsDailyFolder.value.trim();
+    isDirty = true;
+    saveBtn.disabled = false;
+  });
+}
+
+if (settingsShowTemplates) {
+  settingsShowTemplates.addEventListener("change", () => {
+    if (currentMode !== "settings") {
+      return;
+    }
+    currentSettings.showTemplates = settingsShowTemplates.checked;
     isDirty = true;
     saveBtn.disabled = false;
   });
