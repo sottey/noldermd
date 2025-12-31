@@ -138,6 +138,7 @@ func (s *Server) handleTasksCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.logger.Info("task created", "id", task.ID, "title", task.Title, "project", task.Project)
 	writeJSON(w, http.StatusCreated, task)
 }
 
@@ -184,6 +185,7 @@ func (s *Server) handleTasksUpdate(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "unable to save tasks")
 			return
 		}
+		s.logger.Info("task updated", "id", updated.ID, "title", updated.Title, "project", updated.Project, "completed", updated.Completed)
 		writeJSON(w, http.StatusOK, updated)
 		return
 	}
@@ -213,6 +215,7 @@ func (s *Server) handleTasksDelete(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "unable to save tasks")
 			return
 		}
+		s.logger.Info("task deleted", "id", task.ID, "title", task.Title, "project", task.Project)
 		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 		return
 	}
@@ -236,6 +239,7 @@ func (s *Server) loadTasks() (TaskStore, string, error) {
 			if err := s.saveTasks(store); err != nil {
 				return store, "", err
 			}
+			s.logger.Info("tasks file created", "path", path)
 			return store, "Created tasks.json", nil
 		}
 		return TaskStore{}, "", err

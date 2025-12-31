@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const settingsFileName = "settings.json"
@@ -70,35 +71,45 @@ func (s *Server) handleSettingsUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	changed := make([]string, 0, 8)
 	if payload.DarkMode != nil {
 		settings.DarkMode = *payload.DarkMode
+		changed = append(changed, "darkMode")
 	}
 	if payload.DefaultView != nil {
 		settings.DefaultView = *payload.DefaultView
+		changed = append(changed, "defaultView")
 	}
 	if payload.AutosaveEnabled != nil {
 		settings.AutosaveEnabled = *payload.AutosaveEnabled
+		changed = append(changed, "autosaveEnabled")
 	}
 	if payload.AutosaveIntervalSeconds != nil {
 		settings.AutosaveIntervalSeconds = *payload.AutosaveIntervalSeconds
+		changed = append(changed, "autosaveIntervalSeconds")
 	}
 	if payload.SidebarWidth != nil {
 		settings.SidebarWidth = *payload.SidebarWidth
+		changed = append(changed, "sidebarWidth")
 	}
 	if payload.DefaultFolder != nil {
 		settings.DefaultFolder = *payload.DefaultFolder
+		changed = append(changed, "defaultFolder")
 	}
 	if payload.DailyFolder != nil {
 		settings.DailyFolder = *payload.DailyFolder
+		changed = append(changed, "dailyFolder")
 	}
 	if payload.ShowTemplates != nil {
 		settings.ShowTemplates = *payload.ShowTemplates
+		changed = append(changed, "showTemplates")
 	}
 	if err := s.saveSettings(settings); err != nil {
 		writeError(w, http.StatusInternalServerError, "unable to save settings")
 		return
 	}
 
+	s.logger.Info("settings updated", "fields", strings.Join(changed, ","))
 	writeJSON(w, http.StatusOK, settings)
 }
 
@@ -115,19 +126,20 @@ func (s *Server) loadSettings() (Settings, string, error) {
 				Version:                 2,
 				DarkMode:                false,
 				DefaultView:             "split",
-			AutosaveEnabled:         false,
-			AutosaveIntervalSeconds: 30,
-			SidebarWidth:            300,
-			DefaultFolder:           "",
-			DailyFolder:             "",
-			ShowTemplates:           true,
-		}
-		if err := os.MkdirAll(s.notesDir, 0o755); err != nil {
-			return settings, "", err
+				AutosaveEnabled:         false,
+				AutosaveIntervalSeconds: 30,
+				SidebarWidth:            300,
+				DefaultFolder:           "",
+				DailyFolder:             "",
+				ShowTemplates:           true,
+			}
+			if err := os.MkdirAll(s.notesDir, 0o755); err != nil {
+				return settings, "", err
 			}
 			if err := s.saveSettings(settings); err != nil {
 				return settings, "", err
 			}
+			s.logger.Info("settings created", "path", path)
 			return settings, "Created settings.json", nil
 		}
 		return Settings{}, "", err

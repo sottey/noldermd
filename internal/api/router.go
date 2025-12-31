@@ -1,11 +1,22 @@
 package api
 
 import (
+	"log/slog"
+
 	"github.com/go-chi/chi/v5"
 )
 
-func NewRouter(notesDir string) chi.Router {
-	s := &Server{notesDir: notesDir}
+func NewRouter(notesDir string, logger ...*slog.Logger) chi.Router {
+	var baseLogger *slog.Logger
+	if len(logger) > 0 && logger[0] != nil {
+		baseLogger = logger[0]
+	} else {
+		baseLogger = slog.Default()
+	}
+	s := &Server{
+		notesDir: notesDir,
+		logger:   baseLogger.With("component", "api"),
+	}
 
 	r := chi.NewRouter()
 	r.Get("/health", s.handleHealth)

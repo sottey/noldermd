@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 
 type Server struct {
 	notesDir string
+	logger   *slog.Logger
 }
 
 var timeNow = time.Now
@@ -214,6 +216,7 @@ func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 
 	// Task sync from note content is intentionally disabled for now.
 
+	s.logger.Info("note created", "path", relPath, "bytes", len(content), "template", ok)
 	writeJSON(w, http.StatusCreated, map[string]string{"path": relPath})
 }
 
@@ -259,6 +262,7 @@ func (s *Server) handleUpdateNote(w http.ResponseWriter, r *http.Request) {
 
 	// Task sync from note content is intentionally disabled for now.
 
+	s.logger.Info("note updated", "path", relPath, "bytes", len(payload.Content))
 	writeJSON(w, http.StatusOK, map[string]string{"path": relPath})
 }
 
@@ -269,7 +273,7 @@ func (s *Server) handleDeleteNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	absPath, _, err := s.resolvePath(pathParam)
+	absPath, relPath, err := s.resolvePath(pathParam)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -298,6 +302,7 @@ func (s *Server) handleDeleteNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.logger.Info("note deleted", "path", relPath)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
@@ -361,6 +366,7 @@ func (s *Server) handleCreateFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.logger.Info("folder created", "path", relPath)
 	writeJSON(w, http.StatusCreated, map[string]string{"path": relPath})
 }
 
@@ -573,6 +579,7 @@ func (s *Server) handleRenameNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.logger.Info("note renamed", "path", relPath, "newPath", relNewPath)
 	writeJSON(w, http.StatusOK, map[string]string{"path": relPath, "newPath": relNewPath})
 }
 
@@ -630,6 +637,7 @@ func (s *Server) handleRenameFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.logger.Info("folder renamed", "path", relPath, "newPath", relNewPath)
 	writeJSON(w, http.StatusOK, map[string]string{"path": relPath, "newPath": relNewPath})
 }
 
@@ -640,7 +648,7 @@ func (s *Server) handleDeleteFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	absPath, _, err := s.resolvePath(pathParam)
+	absPath, relPath, err := s.resolvePath(pathParam)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -665,6 +673,7 @@ func (s *Server) handleDeleteFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.logger.Info("folder deleted", "path", relPath)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
@@ -1019,5 +1028,14 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
+	logger := slog.Default().With("component", "api", "status", status)
+	switch {
+	case status >= http.StatusInternalServerError:
+		logger.Error("request error", "message", message)
+	case status >= http.StatusBadRequest:
+		logger.Warn("request error", "message", message)
+	default:
+		logger.Info("request error", "message", message)
+	}
 	writeJSON(w, status, map[string]string{"error": message})
 }

@@ -35,10 +35,15 @@ func newRootCmd(runServer func(server.Config) error) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			logLevel, err := cmd.Flags().GetString("log-level")
+			if err != nil {
+				return err
+			}
 
 			cfg := server.Config{
 				NotesDir: notesDir,
 				Port:     port,
+				LogLevel: logLevel,
 			}
 
 			fmt.Printf("NolderMD listening on http://localhost:%d (notes: %s)\n", port, notesDir)
@@ -48,6 +53,7 @@ func newRootCmd(runServer func(server.Config) error) *cobra.Command {
 
 	serveCmd.Flags().String("notes-dir", "./Notes", "Path to the notes directory")
 	serveCmd.Flags().Int("port", 8080, "Port to listen on")
+	serveCmd.Flags().String("log-level", "info", "Log level (debug, info, warn, error)")
 
 	rootCmd.AddCommand(serveCmd)
 
