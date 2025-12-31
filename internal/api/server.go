@@ -256,6 +256,7 @@ func (s *Server) handleUpdateNote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := os.WriteFile(absPath, []byte(payload.Content), 0o644); err != nil {
+		s.logger.Error("unable to update note", "path", relPath, "absPath", absPath, "error", err)
 		writeError(w, http.StatusInternalServerError, "unable to update note")
 		return
 	}
