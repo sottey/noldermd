@@ -375,6 +375,15 @@ function applySidebarWidth(width) {
   currentSettings.sidebarWidth = clamped;
 }
 
+function parentPathForPath(path) {
+  if (!path) {
+    return "";
+  }
+  const parts = path.split("/").filter(Boolean);
+  parts.pop();
+  return parts.join("/");
+}
+
 function findFolderNode(tree, path) {
   if (!tree || !path) {
     return null;
@@ -1280,10 +1289,18 @@ function expandToPath(path) {
       }
     }
   });
+  const targetRow = treeContainer.querySelector(`.node-row[data-path="${CSS.escape(path)}"]`);
+  if (targetRow && targetRow.dataset.type === "folder") {
+    const wrapper = targetRow.closest(".tree-node.folder");
+    if (wrapper) {
+      wrapper.classList.remove("collapsed");
+    }
+  }
 }
 
 async function loadTree(path = "") {
   try {
+    const previousActivePath = currentActivePath;
     const query = path ? `?path=${encodeURIComponent(path)}` : "";
     const [tree, tags, tasksResponse, settingsResponse] = await Promise.all([
       apiFetch(`/tree${query}`),
@@ -1305,7 +1322,20 @@ async function loadTree(path = "") {
     renderTree(currentTree, currentTags, tasksResponse.tasks || []);
     if (currentTree && currentTree.type === "folder" && currentTree.children) {
       const defaultFolder = (currentSettings.defaultFolder || "").trim();
-      const targetNode = defaultFolder ? findFolderNode(currentTree, defaultFolder) : currentTree;
+      const isTaskPath = previousActivePath.startsWith("task:") || previousActivePath.startsWith("task-group:");
+      const isTagPath = previousActivePath === "__tags__";
+      const isTaskRoot = previousActivePath === "__tasks__";
+      let targetNode = null;
+      if (!isTaskPath && !isTagPath && !isTaskRoot) {
+        if (previousActivePath === "") {
+          targetNode = currentTree;
+        } else if (previousActivePath) {
+          targetNode = findFolderNode(currentTree, previousActivePath);
+        }
+      }
+      if (!targetNode) {
+        targetNode = defaultFolder ? findFolderNode(currentTree, defaultFolder) : currentTree;
+      }
       const counts = countTreeItems(targetNode || currentTree);
       currentActivePath = targetNode ? targetNode.path : "";
       setActiveNode(currentActivePath);
@@ -1843,6 +1873,7 @@ async function renameNote(path) {
       method: "PATCH",
       body: JSON.stringify({ path, newPath }),
     });
+    currentActivePath = parentPathForPath(path);
     await loadTree();
     if (currentNotePath === path) {
       await openNote(data.newPath || newPath);
@@ -1923,9 +1954,9 @@ async function deleteNote(path) {
     await apiFetch(`/notes?path=${encodeURIComponent(path)}`, {
       method: "DELETE",
     });
+    currentActivePath = parentPathForPath(path);
     if (currentNotePath === path) {
       currentNotePath = "";
-      currentActivePath = "";
       notePath.textContent = "";
       editor.value = "";
       preview.innerHTML = "";
