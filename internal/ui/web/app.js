@@ -29,6 +29,7 @@ const csvPreview = document.getElementById("csv-preview");
 const summaryPanel = document.getElementById("summary-panel");
 const settingsBtn = document.getElementById("settings-btn");
 const settingsPanel = document.getElementById("settings-panel");
+const brandBtn = document.getElementById("brand-btn");
 const settingsDarkMode = document.getElementById("settings-dark-mode");
 const settingsDefaultView = document.getElementById("settings-default-view");
 const settingsAutosaveEnabled = document.getElementById("settings-autosave-enabled");
@@ -64,6 +65,13 @@ let isDirty = false;
 let syncingScroll = false;
 let activeScrollSource = null;
 let clearScrollSourceTimer = null;
+if (brandBtn) {
+  brandBtn.addEventListener("click", () => {
+    window.location.reload();
+  });
+}
+
+const showTasksRoot = false;
 
 const tagPalette = [
   "#fde68a",
@@ -1228,7 +1236,7 @@ function renderTree(tree, tags, tasks) {
     rootNode.classList.remove("collapsed");
     treeContainer.appendChild(rootNode);
   }
-  if (tasks) {
+  if (showTasksRoot && tasks) {
     const tasksRoot = buildTasksRoot(tasks);
     treeContainer.appendChild(tasksRoot);
   }

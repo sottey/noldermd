@@ -34,10 +34,7 @@ body {
   margin: 0;
   font-family: var(--font-display);
   color: var(--ink);
-  background:
-    radial-gradient(circle at top right, #eef3ff, transparent 55%),
-    radial-gradient(circle at 20% 60%, #f5f7ff, transparent 45%),
-    linear-gradient(120deg, #ffffff, #f6f9ff 60%, #f2f6ff);
+  background: #ffffff;
   min-height: 100vh;
   overflow: hidden;
 }
@@ -108,6 +105,32 @@ body.theme-dark .sidebar {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+
+.brand img {
+  height: 28px;
+  width: auto;
+  display: block;
+}
+
+.brand-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.brand .brand-logo-dark {
+  display: none;
+}
+
+body.theme-dark .brand .brand-logo-light {
+  display: none;
+}
+
+body.theme-dark .brand .brand-logo-dark {
+  display: block;
 }
 
 .tree {
@@ -799,10 +822,13 @@ body.theme-dark .csv-table {
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.85);
   font-size: 12px;
   backdrop-filter: blur(6px);
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
 }
 
 body.theme-dark .tag-bar {
@@ -1121,17 +1147,18 @@ body.theme-dark .search-input {
   top: 98px;
   left: 20px;
   right: 20px;
-  background: #fff;
+  background: var(--surface);
   border-radius: 12px;
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   max-height: 220px;
   overflow: auto;
   z-index: 2;
+  color: var(--ink);
 }
 
 body.theme-dark .search-results {
-  background: #0f172a;
+  background: var(--surface);
 }
 
 .search-results.hidden {
@@ -1147,6 +1174,7 @@ body.theme-dark .search-results {
   border-radius: 10px;
   cursor: pointer;
   font-family: var(--font-display);
+  color: var(--ink);
 }
 
 .search-results button:hover {

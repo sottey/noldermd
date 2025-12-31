@@ -398,27 +398,8 @@ func TestNoteTasksSync(t *testing.T) {
 	}
 	var list TaskListResponse
 	decodeJSONBody(t, rec, &list)
-	if len(list.Tasks) != 1 {
-		t.Fatalf("expected 1 task, got %d", len(list.Tasks))
-	}
-	created := list.Tasks[0]
-	if created.Title != "Task one in +Home project >2025-12-27 -3 #Home #test" {
-		t.Fatalf("unexpected title: %q", created.Title)
-	}
-	if created.Project != "Home" {
-		t.Fatalf("expected project Home, got %q", created.Project)
-	}
-	if created.DueDate != "2025-12-27" {
-		t.Fatalf("expected due date 2025-12-27, got %q", created.DueDate)
-	}
-	if created.Priority != 3 {
-		t.Fatalf("expected priority 3, got %d", created.Priority)
-	}
-	if len(created.Tags) != 2 || created.Tags[0] != "home" || created.Tags[1] != "test" {
-		t.Fatalf("expected tags [home test], got %#v", created.Tags)
-	}
-	if created.Source == nil || created.Source.NotePath != "tasks-note.md" || created.Source.LineNumber != 2 || created.Source.LineHash == "" {
-		t.Fatalf("expected source metadata to be set, got %#v", created.Source)
+	if len(list.Tasks) != 0 {
+		t.Fatalf("expected 0 tasks, got %d", len(list.Tasks))
 	}
 
 	updatedContent := strings.Join([]string{
@@ -439,18 +420,8 @@ func TestNoteTasksSync(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 	decodeJSONBody(t, rec, &list)
-	if len(list.Tasks) != 1 {
-		t.Fatalf("expected 1 task, got %d", len(list.Tasks))
-	}
-	updated := list.Tasks[0]
-	if updated.ID != created.ID {
-		t.Fatalf("expected same task id, got %q", updated.ID)
-	}
-	if updated.Project != "Work" || updated.DueDate != "2025-12-28" || updated.Priority != 2 {
-		t.Fatalf("expected updated fields, got project=%q due=%q priority=%d", updated.Project, updated.DueDate, updated.Priority)
-	}
-	if updated.Source == nil || updated.Source.LineNumber != 2 {
-		t.Fatalf("expected source line 2, got %#v", updated.Source)
+	if len(list.Tasks) != 0 {
+		t.Fatalf("expected 0 tasks, got %d", len(list.Tasks))
 	}
 
 	movedContent := strings.Join([]string{
@@ -472,15 +443,8 @@ func TestNoteTasksSync(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 	decodeJSONBody(t, rec, &list)
-	if len(list.Tasks) != 1 {
-		t.Fatalf("expected 1 task, got %d", len(list.Tasks))
-	}
-	moved := list.Tasks[0]
-	if moved.ID != created.ID {
-		t.Fatalf("expected same task id after move, got %q", moved.ID)
-	}
-	if moved.Source == nil || moved.Source.LineNumber != 3 {
-		t.Fatalf("expected source line 3 after move, got %#v", moved.Source)
+	if len(list.Tasks) != 0 {
+		t.Fatalf("expected 0 tasks, got %d", len(list.Tasks))
 	}
 }
 
@@ -538,6 +502,7 @@ func TestTasksCRUD(t *testing.T) {
 	}
 	var created Task
 	decodeJSONBody(t, rec, &created)
+	_ = created
 	if created.ID == "" {
 		t.Fatalf("expected task id to be set")
 	}
@@ -716,8 +681,8 @@ func TestSearchEndpoint(t *testing.T) {
 	}
 	matches = nil
 	decodeJSONBody(t, rec, &matches)
-	if len(matches) != 1 || matches[0].Type != "task" || matches[0].ID != created.ID {
-		t.Fatalf("expected task match, got %#v", matches)
+	if len(matches) != 0 {
+		t.Fatalf("expected no task matches, got %#v", matches)
 	}
 }
 

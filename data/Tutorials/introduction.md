@@ -88,3 +88,4 @@ Use the search input to find notes by filename or content.
 ---
 
 If you get stuck, check `README.md` for API details and rules.
+#tutorial

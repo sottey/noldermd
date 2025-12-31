@@ -1,6 +1,9 @@
 ## TODO
 
-
+- [ ] Drag-and-drop in the sidebar tree:
+  - Move notes/folders by dropping onto another folder.
+  - Dragging a task project does nothing.
+  - Dropping a task on another project updates its project.
 
 ## COMPLETED
 - [X] Template use (context menu items?)

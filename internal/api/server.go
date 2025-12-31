@@ -212,10 +212,7 @@ func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.syncTasksFromNote(relPath, content); err != nil {
-		writeError(w, http.StatusInternalServerError, "unable to sync tasks from note")
-		return
-	}
+	// Task sync from note content is intentionally disabled for now.
 
 	writeJSON(w, http.StatusCreated, map[string]string{"path": relPath})
 }
@@ -260,12 +257,7 @@ func (s *Server) handleUpdateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if isMarkdown(absPath) {
-		if err := s.syncTasksFromNote(relPath, payload.Content); err != nil {
-			writeError(w, http.StatusInternalServerError, "unable to sync tasks from note")
-			return
-		}
-	}
+	// Task sync from note content is intentionally disabled for now.
 
 	writeJSON(w, http.StatusOK, map[string]string{"path": relPath})
 }
@@ -430,26 +422,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	taskStore, _, err := s.loadTasks()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "unable to search tasks")
-		return
-	}
-	for _, task := range taskStore.Tasks {
-		title := strings.ToLower(task.Title)
-		notes := strings.ToLower(task.Notes)
-		project := strings.ToLower(task.Project)
-		if strings.Contains(title, lowerQuery) ||
-			strings.Contains(notes, lowerQuery) ||
-			strings.Contains(project, lowerQuery) ||
-			tagsContain(task.Tags, lowerQuery) {
-			results = append(results, SearchResult{
-				Name: task.Title,
-				Type: "task",
-				ID:   task.ID,
-			})
-		}
-	}
+	// Task search is intentionally disabled for now.
 
 	writeJSON(w, http.StatusOK, results)
 }

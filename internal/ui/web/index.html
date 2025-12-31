@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>NolderMD</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="stylesheet" href="/vendor/highlight.css" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -12,7 +13,12 @@
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
         <div class="sidebar-title">
-          <div class="brand">NolderMD</div>
+          <div class="brand">
+            <button id="brand-btn" class="brand-btn" type="button" aria-label="Reload">
+              <img class="brand-logo brand-logo-light" src="/logo-light.png" alt="NolderMD" />
+              <img class="brand-logo brand-logo-dark" src="/logo-dark.png" alt="NolderMD" />
+            </button>
+          </div>
           <div class="sidebar-actions">
             <button id="refresh-btn" class="ghost icon-btn" title="Refresh" aria-label="Refresh">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -58,14 +64,6 @@
           </button>
         </div>
       </header>
-      <div id="tag-bar" class="tag-bar hidden">
-        <button id="tag-add-btn" class="tag-add-btn" title="Add tag" aria-label="Add tag">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M11 5h2v14h-2zM5 11h14v2H5z"/>
-          </svg>
-        </button>
-        <div id="tag-pills" class="tag-pills"></div>
-      </div>
       <section id="main-content" class="main-content">
         <div id="editor-pane" class="pane">
           <div id="task-editor" class="task-editor hidden">
@@ -190,6 +188,14 @@
           <div id="summary-panel" class="summary-panel hidden"></div>
         </div>
       </section>
+      <div id="tag-bar" class="tag-bar hidden">
+        <button id="tag-add-btn" class="tag-add-btn" title="Add tag" aria-label="Add tag">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M11 5h2v14h-2zM5 11h14v2H5z"/>
+          </svg>
+        </button>
+        <div id="tag-pills" class="tag-pills"></div>
+      </div>
     </main>
   </div>
 
