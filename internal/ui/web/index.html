@@ -52,16 +52,27 @@
           <div id="note-path" class="note-path">No note selected</div>
           <button id="save-btn" class="primary" disabled>Save</button>
         </div>
-        <div class="view-selector" role="group" aria-label="View selector">
-          <button class="view-btn" data-view="edit" title="Edit">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.25V20h2.75L17.81 8.94l-2.75-2.75L4 17.25zm15.71-9.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 2.75 2.75 1.99-1.66z"/></svg>
+        <div class="header-actions">
+          <button id="date-pill" class="date-pill" type="button" title="Open today's note"></button>
+          <button id="calendar-btn" class="ghost icon-btn calendar-btn" type="button" title="Open date picker" aria-label="Open date picker">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1V3a1 1 0 0 1 1-1zm12 8H5v9h14v-9zM5 8h14V6H5v2z"/>
+            </svg>
           </button>
-          <button class="view-btn" data-view="preview" title="Preview">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
-          </button>
-          <button class="view-btn" data-view="split" title="Split">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h7v14H4V5zm9 0h7v14h-7V5z"/></svg>
-          </button>
+          <div id="date-popover" class="date-popover hidden" role="dialog" aria-label="Pick date">
+            <input id="date-picker" class="date-picker" type="date" />
+          </div>
+          <div class="view-selector" role="group" aria-label="View selector">
+            <button class="view-btn" data-view="edit" title="Edit">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.25V20h2.75L17.81 8.94l-2.75-2.75L4 17.25zm15.71-9.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 2.75 2.75 1.99-1.66z"/></svg>
+            </button>
+            <button class="view-btn" data-view="preview" title="Preview">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
+            </button>
+            <button class="view-btn" data-view="split" title="Split">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h7v14H4V5zm9 0h7v14h-7V5z"/></svg>
+            </button>
+          </div>
         </div>
       </header>
       <section id="main-content" class="main-content">

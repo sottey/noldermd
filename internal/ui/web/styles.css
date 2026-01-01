@@ -276,6 +276,8 @@ body.theme-dark .brand .brand-logo-dark {
   border-bottom: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(8px);
+  position: relative;
+  z-index: 5;
 }
 
 body.theme-dark .main-header {
@@ -286,6 +288,69 @@ body.theme-dark .main-header {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+.date-pill {
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, transform 150ms ease, border-color 150ms ease;
+}
+
+.date-pill:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.date-pill:active {
+  transform: translateY(0);
+}
+
+.calendar-btn {
+  border-radius: 999px;
+}
+
+.date-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: var(--shadow);
+  z-index: 20;
+}
+
+body.date-open .calendar-btn {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.date-picker {
+  position: relative;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  min-width: 160px;
 }
 
 .note-path {

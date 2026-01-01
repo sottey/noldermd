@@ -18,6 +18,8 @@ This file documents the current project shape and interaction model.
 - Settings button in the sidebar header opens a settings form.
 - The sidebar width is adjustable with a draggable splitter.
 - A view selector in the top-right provides edit, preview, and split modes.
+- The main header includes a date pill that opens (and creates) today's daily note.
+- A calendar icon in the main header opens a date picker to jump to a specific daily note.
 - Context menus:
   - Right-click on a folder: New Folder, New Note, Edit Template, Rename, Delete, Expand/Collapse.
   - Right-click on a note: New Note, Rename, Delete.
@@ -57,10 +59,18 @@ This file documents the current project shape and interaction model.
 - Task list rows include a checkbox toggle and open the source note on click.
 - Render a settings form with sections for Display (dark mode, default view, show templates),
   Autosave (autosave, interval), and Folders (default folder, daily folder).
+- Daily Folder determines where the date pill creates or opens the daily note.
 - Ensure tag labels remain legible in dark mode.
 - Render a tag bar in the preview pane.
 - Call API endpoints for all mutations and refresh operations.
 - Provide filename/content search with a dropdown of matches.
+- Provide keyboard shortcuts using Ctrl+Alt:
+  - Ctrl+Alt+S: Save
+  - Ctrl+Alt+E: Edit view
+  - Ctrl+Alt+P: Preview view
+  - Ctrl+Alt+B: Split view
+  - Ctrl+Alt+D: Open today's daily note
+  - Ctrl+Alt+C: Open date picker
 
 ## API shape (proposed)
 - **Base path**: `/api/v1` (no auth for now).

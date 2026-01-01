@@ -114,10 +114,13 @@ Example:
   state.
 - Main pane supports edit, preview, or split view with a draggable splitter.
 - View selector (top right) toggles edit/preview/split.
+- Main header includes a date pill that opens (and creates) today's daily note.
+- Calendar icon opens a date picker to jump to a specific daily note.
 - Settings button sits beside refresh in the sidebar header and opens a settings form.
 - Settings include dark mode, default view, and autosave options.
 - Settings include a Show Templates toggle for `.template` files.
 - Settings are grouped into Display, Autosave, and Folders sections.
+- Daily Folder controls where the date pill opens or creates the daily note.
 - Preview pane shows a sticky tag bar with clickable tag pills.
 - Context menus:
   - Folder: New Folder, New Note, Edit Template, Rename, Delete, Expand/Collapse.
@@ -128,3 +131,12 @@ Example:
 - Search input lists matching notes; selecting one opens it.
 - Editor and preview scroll independently from the sidebar.
 - Editor and preview panes scroll together (proportional sync).
+
+## Keyboard shortcuts
+
+- Ctrl+Alt+S: Save
+- Ctrl+Alt+E: Edit view
+- Ctrl+Alt+P: Preview view
+- Ctrl+Alt+B: Split view
+- Ctrl+Alt+D: Open today's daily note
+- Ctrl+Alt+C: Open date picker

@@ -7,6 +7,10 @@ const editor = document.getElementById("editor");
 const preview = document.getElementById("preview");
 const notePath = document.getElementById("note-path");
 const saveBtn = document.getElementById("save-btn");
+const datePill = document.getElementById("date-pill");
+const calendarBtn = document.getElementById("calendar-btn");
+let datePopover = document.getElementById("date-popover");
+let datePicker = document.getElementById("date-picker");
 const viewButtons = Array.from(document.querySelectorAll(".view-btn"));
 const viewSelector = document.querySelector(".view-selector");
 const contextMenu = document.getElementById("context-menu");
@@ -1777,6 +1781,119 @@ function ensureTemplateName(name) {
   return `${name}.template`;
 }
 
+function formatDailyDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDatePill(date) {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function joinPath(parent, child) {
+  if (!parent) {
+    return child;
+  }
+  return `${parent.replace(/\/+$/, "")}/${child}`;
+}
+
+function updateDatePill() {
+  if (!datePill) {
+    return;
+  }
+  const today = new Date();
+  const label = formatDatePill(today);
+  datePill.textContent = label;
+  datePill.title = `Open ${label} note`;
+  datePill.dataset.date = formatDailyDate(today);
+  if (refreshDateElements()) {
+    datePicker.value = datePill.dataset.date;
+  }
+}
+
+function refreshDateElements() {
+  if (!datePopover) {
+    datePopover = document.getElementById("date-popover");
+  }
+  if (!datePicker) {
+    datePicker = document.getElementById("date-picker");
+  }
+  return !!datePopover && !!datePicker;
+}
+
+function isDatePopoverOpen() {
+  return refreshDateElements() && !datePopover.classList.contains("hidden");
+}
+
+function showDatePopover() {
+  if (!refreshDateElements()) {
+    return;
+  }
+  const fallbackDate = datePill ? datePill.dataset.date : formatDailyDate(new Date());
+  datePicker.value = fallbackDate;
+  datePopover.classList.remove("hidden");
+  datePicker.focus();
+  document.body.classList.add("date-open");
+}
+
+function hideDatePopover() {
+  if (!refreshDateElements()) {
+    return;
+  }
+  datePopover.classList.add("hidden");
+  datePicker.blur();
+  document.body.classList.remove("date-open");
+}
+
+function toggleDatePopover() {
+  if (!datePopover || !datePicker) {
+    return;
+  }
+  if (isDatePopoverOpen()) {
+    hideDatePopover();
+    return;
+  }
+  showDatePopover();
+}
+
+async function openDailyNoteForDate(dateString) {
+  const dailyFolder = (currentSettings.dailyFolder || "").trim();
+  if (!dailyFolder) {
+    showSettings();
+    alert("Set a Daily Folder in Settings to use the date pill.");
+    return;
+  }
+  const notePath = joinPath(dailyFolder, dateString);
+  try {
+    const data = await apiFetch("/notes", {
+      method: "POST",
+      body: JSON.stringify({
+        path: notePath,
+        content: "",
+      }),
+    });
+    await loadTree();
+    await openNote(data.path);
+  } catch (err) {
+    const message = String(err.message || "").toLowerCase();
+    if (message.includes("already exists")) {
+      await openNote(ensureMarkdownName(notePath));
+      return;
+    }
+    alert(err.message);
+  }
+}
+
+async function openDailyNote() {
+  await openDailyNoteForDate(formatDailyDate(new Date()));
+}
+
 async function createNote(parentPath = "") {
   const name = promptForName("New note name");
   if (!name) {
@@ -2319,6 +2436,42 @@ viewButtons.forEach((btn) => {
   btn.addEventListener("click", () => setView(btn.dataset.view));
 });
 
+if (datePill) {
+  datePill.addEventListener("click", () => openDailyNote());
+  updateDatePill();
+  setInterval(updateDatePill, 60000);
+}
+
+if (calendarBtn) {
+  calendarBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleDatePopover();
+  });
+}
+
+document.addEventListener("change", (event) => {
+  if (!refreshDateElements()) {
+    return;
+  }
+  if (event.target !== datePicker) {
+    return;
+  }
+  const value = event.target.value;
+  if (!value) {
+    return;
+  }
+  const dailyFolder = (currentSettings.dailyFolder || "").trim();
+  if (!dailyFolder) {
+    showSettings();
+    alert("Set a Daily Folder in Settings to use the date picker.");
+    hideDatePopover();
+    return;
+  }
+  openDailyNoteForDate(value);
+  hideDatePopover();
+});
+
 tagAddBtn.addEventListener("click", () => {
   const input = window.prompt("Add tag");
   if (input === null) {
@@ -2328,30 +2481,40 @@ tagAddBtn.addEventListener("click", () => {
 });
 
 window.addEventListener("keydown", (event) => {
-  if (!(event.metaKey || event.ctrlKey)) {
+  if (!(event.ctrlKey && event.altKey)) {
     return;
   }
   const key = event.key.toLowerCase();
-  if (key === "s" && event.shiftKey) {
+  if (key === "s") {
     event.preventDefault();
     saveCurrent();
     return;
   }
-  if (key === "e" && event.shiftKey) {
+  if (key === "e") {
     event.preventDefault();
     setView("edit");
     return;
   }
-  if (key === "p" && event.shiftKey) {
+  if (key === "p") {
     event.preventDefault();
     setView("preview");
     return;
   }
-  if (key === "b" && event.shiftKey) {
+  if (key === "b") {
     event.preventDefault();
     setView("split");
+    return;
   }
-});
+  if (key === "d") {
+    event.preventDefault();
+    openDailyNote();
+    return;
+  }
+  if (key === "c") {
+    event.preventDefault();
+    toggleDatePopover();
+  }
+}, { capture: true });
 
 treeContainer.addEventListener("contextmenu", (event) => {
   const row = event.target.closest(".node-row");
@@ -2371,6 +2534,25 @@ tagBar.addEventListener("mousedown", () => hideContextMenu(), true);
 previewPane.addEventListener("mousedown", () => hideContextMenu(), true);
 mainContent.addEventListener("mousedown", () => hideContextMenu(), true);
 document.addEventListener("click", () => hideContextMenu());
+
+document.addEventListener("mousedown", (event) => {
+  if (!isDatePopoverOpen()) {
+    return;
+  }
+  if (refreshDateElements() && datePopover.contains(event.target)) {
+    return;
+  }
+  if (calendarBtn && calendarBtn.contains(event.target)) {
+    return;
+  }
+  hideDatePopover();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && isDatePopoverOpen()) {
+    hideDatePopover();
+  }
+});
 
 searchBtn.addEventListener("click", (event) => {
   event.preventDefault();
