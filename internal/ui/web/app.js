@@ -993,7 +993,7 @@ function restoreTaskSelection(previousActivePath, tasks) {
   if (previousActivePath.startsWith("task-group:")) {
     const name = previousActivePath.replace("task-group:", "");
     const { activeTasks, completedTasks, projectMap, noProject } = splitTasksByProject(tasks || []);
-    let groupTasks = null;
+    let groupTasks = [];
     let title = "";
     if (name === "Completed") {
       groupTasks = completedTasks;
@@ -1004,20 +1004,13 @@ function restoreTaskSelection(previousActivePath, tasks) {
     } else if (projectMap.has(name)) {
       groupTasks = projectMap.get(name);
       title = `Project: ${name}`;
+    } else {
+      title = `Project: ${name}`;
     }
-    if (groupTasks) {
-      currentActivePath = `task-group:${name}`;
-      setActiveNode(currentActivePath);
-      showTaskList(title, sortTasksForView(groupTasks, name), taskGroupSummary(groupTasks, name));
-      return true;
-    }
-    if (activeTasks.length > 0) {
-      currentActivePath = "__tasks__";
-      setActiveNode(currentActivePath);
-      const summaryText = `${activeTasks.length} active task${activeTasks.length === 1 ? "" : "s"} across ${projectMap.size} project${projectMap.size === 1 ? "" : "s"}`;
-      showTaskList("Tasks", sortTasksForView(activeTasks, "__tasks__"), summaryText);
-      return true;
-    }
+    currentActivePath = `task-group:${name}`;
+    setActiveNode(currentActivePath);
+    showTaskList(title, sortTasksForView(groupTasks, name), taskGroupSummary(groupTasks, name));
+    return true;
   }
   return false;
 }
