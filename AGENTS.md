@@ -88,6 +88,7 @@ This file documents the current project shape and interaction model.
 - **Tasks**:
   - `GET /api/v1/tasks` returns tasks parsed from notes.
   - `PATCH /api/v1/tasks/toggle` toggles completion for a task line.
+  - `PATCH /api/v1/tasks/archive` archives completed tasks by prefixing `~ `.
 - **Settings**:
   - `GET /api/v1/settings` returns settings.
   - `PATCH /api/v1/settings` updates settings.

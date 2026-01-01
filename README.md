@@ -51,6 +51,7 @@ can create notes and templates inside the mounted `/notes` folder.
 - `PATCH /settings` `{ "darkMode": true, "defaultView": "split", "autosaveEnabled": false, "autosaveIntervalSeconds": 30, "sidebarWidth": 300, "defaultFolder": "Folder/Subfolder", "dailyFolder": "Folder/Subfolder", "showTemplates": true }`
 - `GET /tasks` (lists tasks parsed from notes)
 - `PATCH /tasks/toggle` `{ "path": "Note.md", "lineNumber": 12, "lineHash": "...", "completed": true }`
+- `PATCH /tasks/archive` (archives completed tasks by prefixing `~ `)
 
 ## Notes rules
 

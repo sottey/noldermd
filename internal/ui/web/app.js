@@ -849,12 +849,19 @@ function buildTaskGroup(name, tasks, depth) {
 
   row.addEventListener("contextmenu", (event) => {
     event.preventDefault();
-    showContextMenu(event.clientX, event.clientY, [
+    const items = [
       {
         label: "Refresh",
         action: () => loadTree(),
       },
-    ]);
+    ];
+    if (name === "Completed") {
+      items.unshift({
+        label: "Archive Completed",
+        action: () => archiveCompletedTasks(),
+      });
+    }
+    showContextMenu(event.clientX, event.clientY, items);
   });
 
   return wrapper;
@@ -1135,6 +1142,18 @@ async function toggleTaskCompletion(task, completed) {
         completed,
       }),
     });
+    await loadTree();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function archiveCompletedTasks() {
+  try {
+    const result = await apiFetch("/tasks/archive", { method: "PATCH" });
+    if (result && result.archived !== undefined) {
+      alert(`Archived ${result.archived} completed task${result.archived === 1 ? "" : "s"}.`);
+    }
     await loadTree();
   } catch (err) {
     alert(err.message);

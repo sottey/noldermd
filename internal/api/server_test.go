@@ -476,6 +476,50 @@ func TestTasksToggle(t *testing.T) {
 	}
 }
 
+func TestTasksArchiveCompleted(t *testing.T) {
+	dir, router := setupTestRouter(t)
+
+	content := strings.Join([]string{
+		"- [x] Done task",
+		"- [ ] Active task",
+		"  - [✓] Done child",
+	}, "\n")
+	writeFile(t, filepath.Join(dir, "archive.md"), content)
+
+	rec := doRequest(t, router, http.MethodPatch, "/tasks/archive", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "archive.md"))
+	if err != nil {
+		t.Fatalf("read updated note: %v", err)
+	}
+	lines := strings.Split(string(data), "\n")
+	if !strings.HasPrefix(lines[0], "~ - [x] ") {
+		t.Fatalf("expected completed task to be archived, got %q", lines[0])
+	}
+	if !strings.HasPrefix(lines[2], "  ~ - [✓] ") {
+		t.Fatalf("expected completed task to be archived with indentation, got %q", lines[2])
+	}
+	if lines[1] != "- [ ] Active task" {
+		t.Fatalf("expected active task to remain, got %q", lines[1])
+	}
+
+	rec = doRequest(t, router, http.MethodGet, "/tasks", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var list TaskListResponse
+	decodeJSONBody(t, rec, &list)
+	if len(list.Tasks) != 1 {
+		t.Fatalf("expected 1 remaining task, got %d", len(list.Tasks))
+	}
+	if list.Tasks[0].Text != "Active task" {
+		t.Fatalf("expected Active task to remain, got %q", list.Tasks[0].Text)
+	}
+}
+
 func TestFoldersCRUD(t *testing.T) {
 	_, router := setupTestRouter(t)
 

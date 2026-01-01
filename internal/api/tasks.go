@@ -35,6 +35,11 @@ type TaskTogglePayload struct {
 	Completed  bool   `json:"completed"`
 }
 
+type TaskArchiveResponse struct {
+	Archived int `json:"archived"`
+	Files    int `json:"files"`
+}
+
 func (s *Server) handleTasksList(w http.ResponseWriter, r *http.Request) {
 	tasks, notice, err := s.listTasks()
 	if err != nil {
@@ -131,6 +136,15 @@ func (s *Server) handleTasksToggle(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 }
 
+func (s *Server) handleTasksArchive(w http.ResponseWriter, r *http.Request) {
+	archived, files, err := s.archiveCompletedTasks()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "unable to archive tasks")
+		return
+	}
+	writeJSON(w, http.StatusOK, TaskArchiveResponse{Archived: archived, Files: files})
+}
+
 func (s *Server) listTasks() ([]TaskItem, string, error) {
 	var tasks []TaskItem
 	var warnings []string
@@ -206,4 +220,53 @@ func lineHashMatches(line, hash string) bool {
 	}
 	raw := strings.TrimSuffix(line, "\r")
 	return hashLine(raw) == hash
+}
+
+func (s *Server) archiveCompletedTasks() (int, int, error) {
+	archived := 0
+	filesUpdated := 0
+
+	err := filepath.WalkDir(s.notesDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if isIgnoredFile(d.Name()) || !isMarkdown(d.Name()) {
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		lines := strings.Split(string(data), "\n")
+		changed := false
+		for i, line := range lines {
+			updated, ok := archiveCompletedTaskLine(line)
+			if !ok {
+				continue
+			}
+			lines[i] = updated
+			archived += 1
+			changed = true
+		}
+		if !changed {
+			return nil
+		}
+		output := strings.Join(lines, "\n")
+		if err := os.WriteFile(path, []byte(output), 0o644); err != nil {
+			return err
+		}
+		filesUpdated += 1
+		return nil
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+	if archived > 0 {
+		s.logger.Info("archived completed tasks", "count", archived, "files", filesUpdated)
+	}
+	return archived, filesUpdated, nil
 }

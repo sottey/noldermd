@@ -9,14 +9,15 @@ import (
 )
 
 var (
-	todoLinePattern     = regexp.MustCompile(`^\s*-\s+\[( |x|X|✓)\]\s+`)
-	todoTogglePattern   = regexp.MustCompile(`^(\s*-\s+\[)( |x|X|✓)(\]\s+)`)
-	taskProjectPattern  = regexp.MustCompile(`(^|\s)\+([A-Za-z]+)\b`)
-	taskTagPattern      = regexp.MustCompile(`(^|\s)#([A-Za-z]+)\b`)
-	taskMentionPattern  = regexp.MustCompile(`(^|\s)@([A-Za-z]+)\b`)
-	taskDuePattern      = regexp.MustCompile(`(^|\s)>(\S+)`)
-	taskPriorityPattern = regexp.MustCompile(`(^|\s)\^([1-5])\b`)
-	taskTokenPattern    = regexp.MustCompile(`(^|\s)(#[A-Za-z]+|@[A-Za-z]+|\+[A-Za-z]+|\^[1-5]|>\S+)`)
+	todoLinePattern      = regexp.MustCompile(`^\s*-\s+\[( |x|X|✓)\]\s+`)
+	todoTogglePattern    = regexp.MustCompile(`^(\s*-\s+\[)( |x|X|✓)(\]\s+)`)
+	todoCompletedPattern = regexp.MustCompile(`^\s*-\s+\[(x|X|✓)\]\s+`)
+	taskProjectPattern   = regexp.MustCompile(`(^|\s)\+([A-Za-z]+)\b`)
+	taskTagPattern       = regexp.MustCompile(`(^|\s)#([A-Za-z]+)\b`)
+	taskMentionPattern   = regexp.MustCompile(`(^|\s)@([A-Za-z]+)\b`)
+	taskDuePattern       = regexp.MustCompile(`(^|\s)>(\S+)`)
+	taskPriorityPattern  = regexp.MustCompile(`(^|\s)\^([1-5])\b`)
+	taskTokenPattern     = regexp.MustCompile(`(^|\s)(#[A-Za-z]+|@[A-Za-z]+|\+[A-Za-z]+|\^[1-5]|>\S+)`)
 )
 
 type ParsedTodo struct {
@@ -92,6 +93,30 @@ func setTaskLineCompletion(line string, completed bool) (string, bool) {
 	}
 	updated := line[:match[4]] + marker + line[match[5]:]
 	return updated, true
+}
+
+func archiveCompletedTaskLine(line string) (string, bool) {
+	if !todoCompletedPattern.MatchString(line) {
+		return "", false
+	}
+	trimmed := strings.TrimSuffix(line, "\r")
+	ending := ""
+	if trimmed != line {
+		ending = "\r"
+	}
+	indent := leadingWhitespace(trimmed)
+	rest := strings.TrimPrefix(trimmed, indent)
+	updated := indent + "~ " + rest + ending
+	return updated, true
+}
+
+func leadingWhitespace(text string) string {
+	for i, r := range text {
+		if r != ' ' && r != '\t' {
+			return text[:i]
+		}
+	}
+	return text
 }
 
 func extractFirstMatch(pattern *regexp.Regexp, text string) string {
