@@ -4,7 +4,7 @@
   - Move notes/folders by dropping onto another folder.
   - Dragging a task project does nothing.
   - Dropping a task on another project updates its project.
-- [ ] tasks in notes (if first char of a line is * followed by data, it is a task. +PROJECT >DUEDATE -PRI #tag #tag #tag)
+- [ ] task filters by tag/mention/project across parsed note tasks
     Example: * This is a task in the +Home project and is due >2025-12-27 and is priority -3 #home #test
 
 ## COMPLETED

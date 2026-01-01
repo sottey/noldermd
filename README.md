@@ -49,11 +49,8 @@ can create notes and templates inside the mounted `/notes` folder.
 - `GET /tags` (tags with notes that contain them)
 - `GET /settings` (app settings)
 - `PATCH /settings` `{ "darkMode": true, "defaultView": "split", "autosaveEnabled": false, "autosaveIntervalSeconds": 30, "sidebarWidth": 300, "defaultFolder": "Folder/Subfolder", "dailyFolder": "Folder/Subfolder", "showTemplates": true }`
-- `GET /tasks` (lists tasks)
-- `GET /tasks/<id>` (fetch task)
-- `POST /tasks` `{ "title": "...", "project": "...", "tags": [], "duedate": "YYYY-MM-DD", "priority": 3, "completed": false, "notes": "..." }`
-- `PATCH /tasks/<id>` `{ "title": "...", "project": "...", "tags": [], "duedate": "YYYY-MM-DD", "priority": 3, "completed": false, "notes": "..." }`
-- `DELETE /tasks/<id>`
+- `GET /tasks` (lists tasks parsed from notes)
+- `PATCH /tasks/toggle` `{ "path": "Note.md", "lineNumber": 12, "lineHash": "...", "completed": true }`
 
 ## Notes rules
 
@@ -81,10 +78,17 @@ can create notes and templates inside the mounted `/notes` folder.
 
 ## Tasks rules
 
-- Tasks live in `Notes/tasks.json` and are created automatically if missing.
-- Tasks use UUIDs for stable IDs.
-- Priority is 1-5 (1 highest, 5 lowest).
-- Due dates are stored as `YYYY-MM-DD`.
+- Tasks are parsed on the fly from note contents; no `tasks.json` is used.
+- A task line starts with optional whitespace then `- [ ] ` or `- [x] ` (space required after the bracket).
+- Completed states accept `[x]`, `[X]`, or `[✓]`.
+- Markers in the line: `#tag`, `@mention`, `+project`, `>due`, `^priority` (1-5). Only one project is used (first match wins).
+- Due dates are parsed from the `>` marker; unrecognized formats are returned as warnings.
+
+Example:
+```
+- [ ] Call Mom +Home #family @alice >2025-01-31 ^2
+  - [x] File taxes +Finance >2025-02-01 ^1
+```
 
 ## Settings rules
 
@@ -103,7 +107,8 @@ can create notes and templates inside the mounted `/notes` folder.
 - Left sidebar also renders a "Tags" root (collapsed by default), refreshed on
   tree reload.
 - Left sidebar renders a "Tasks" root with projects, "No Project", and "Completed".
-- Clicking Notes/Tasks/Tags roots or any folder/project group shows a summary panel.
+- Clicking Notes/Tags roots or any folder shows a summary panel.
+- Clicking Tasks root or any project group shows a task list in the main pane.
 - Folder and tag rows show centered chevrons indicating expanded/collapsed
   state.
 - Main pane supports edit, preview, or split view with a draggable splitter.
@@ -119,6 +124,6 @@ can create notes and templates inside the mounted `/notes` folder.
   - Sidebar empty area: New Folder, New Note.
   - Edit Template creates `default.template` if missing and opens it for editing.
 - Refresh button reloads the tree.
-- Search input lists matching notes and tasks; selecting one opens it.
+- Search input lists matching notes; selecting one opens it.
 - Editor and preview scroll independently from the sidebar.
 - Editor and preview panes scroll together (proportional sync).

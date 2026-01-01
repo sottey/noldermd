@@ -214,7 +214,7 @@ func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Task sync from note content is intentionally disabled for now.
+	// Task parsing is done on demand from note contents.
 
 	s.logger.Info("note created", "path", relPath, "bytes", len(content), "template", ok)
 	writeJSON(w, http.StatusCreated, map[string]string{"path": relPath})
@@ -261,7 +261,7 @@ func (s *Server) handleUpdateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Task sync from note content is intentionally disabled for now.
+	// Task parsing is done on demand from note contents.
 
 	s.logger.Info("note updated", "path", relPath, "bytes", len(payload.Content))
 	writeJSON(w, http.StatusOK, map[string]string{"path": relPath})

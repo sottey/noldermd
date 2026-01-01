@@ -375,76 +375,104 @@ func TestNotesCRUD(t *testing.T) {
 	}
 }
 
-func TestNoteTasksSync(t *testing.T) {
-	_, router := setupTestRouter(t)
+func TestTasksFromNotes(t *testing.T) {
+	dir, router := setupTestRouter(t)
 
-	initialContent := strings.Join([]string{
+	content := strings.Join([]string{
 		"Intro",
-		"* Task one in +Home project >2025-12-27 -3 #Home #test",
-		"",
+		"- [ ] Call Mom +Home #Family @Alice >2025-01-31 ^2",
+		"  - [x] Done thing +Work >2025-02-01 ^5",
+		"- [ ] Bad due date >tomorrow",
 	}, "\n")
+	writeFile(t, filepath.Join(dir, "tasks-note.md"), content)
 
-	rec := doRequest(t, router, http.MethodPost, "/notes", map[string]string{
-		"path":    "tasks-note.md",
-		"content": initialContent,
-	})
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("expected status 201, got %d", rec.Code)
-	}
-
-	rec = doRequest(t, router, http.MethodGet, "/tasks", nil)
+	rec := doRequest(t, router, http.MethodGet, "/tasks", nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 	var list TaskListResponse
 	decodeJSONBody(t, rec, &list)
-	if len(list.Tasks) != 0 {
-		t.Fatalf("expected 0 tasks, got %d", len(list.Tasks))
+	if len(list.Tasks) != 3 {
+		t.Fatalf("expected 3 tasks, got %d", len(list.Tasks))
+	}
+	if list.Notice == "" {
+		t.Fatalf("expected notice for invalid due dates")
 	}
 
-	updatedContent := strings.Join([]string{
-		"Intro",
-		"* Task one updated +Work >2025-12-28 -2 #NewTag",
-	}, "\n")
+	var first TaskItem
+	for _, task := range list.Tasks {
+		if task.LineNumber == 2 {
+			first = task
+			break
+		}
+	}
+	if first.Text != "Call Mom" {
+		t.Fatalf("expected task text Call Mom, got %q", first.Text)
+	}
+	if first.Project != "home" {
+		t.Fatalf("expected project home, got %q", first.Project)
+	}
+	if len(first.Tags) != 1 || first.Tags[0] != "family" {
+		t.Fatalf("expected tags to include family, got %#v", first.Tags)
+	}
+	if len(first.Mentions) != 1 || first.Mentions[0] != "alice" {
+		t.Fatalf("expected mentions to include alice, got %#v", first.Mentions)
+	}
+	if first.DueDate != "2025-01-31" || first.DueDateISO != "2025-01-31" {
+		t.Fatalf("expected due date 2025-01-31, got %q/%q", first.DueDate, first.DueDateISO)
+	}
+	if first.Priority != 2 {
+		t.Fatalf("expected priority 2, got %d", first.Priority)
+	}
+	if first.Completed {
+		t.Fatalf("expected task to be incomplete")
+	}
+}
 
-	rec = doRequest(t, router, http.MethodPatch, "/notes", map[string]string{
-		"path":    "tasks-note.md",
-		"content": updatedContent,
+func TestTasksToggle(t *testing.T) {
+	dir, router := setupTestRouter(t)
+
+	content := strings.Join([]string{
+		"- [ ] Task One",
+		"- [x] Task Two",
+	}, "\n")
+	writeFile(t, filepath.Join(dir, "toggle.md"), content)
+
+	rec := doRequest(t, router, http.MethodGet, "/tasks", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var list TaskListResponse
+	decodeJSONBody(t, rec, &list)
+
+	var target TaskItem
+	for _, task := range list.Tasks {
+		if task.Path == "toggle.md" && task.LineNumber == 1 {
+			target = task
+			break
+		}
+	}
+	if target.LineHash == "" {
+		t.Fatalf("expected line hash for task")
+	}
+
+	rec = doRequest(t, router, http.MethodPatch, "/tasks/toggle", map[string]any{
+		"path":       "toggle.md",
+		"lineNumber": target.LineNumber,
+		"lineHash":   target.LineHash,
+		"completed":  true,
 	})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	rec = doRequest(t, router, http.MethodGet, "/tasks", nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
+	data, err := os.ReadFile(filepath.Join(dir, "toggle.md"))
+	if err != nil {
+		t.Fatalf("read updated note: %v", err)
 	}
-	decodeJSONBody(t, rec, &list)
-	if len(list.Tasks) != 0 {
-		t.Fatalf("expected 0 tasks, got %d", len(list.Tasks))
-	}
-
-	movedContent := strings.Join([]string{
-		"New top line",
-		"Intro",
-		"* Task one updated +Work >2025-12-28 -2 #NewTag",
-	}, "\n")
-
-	rec = doRequest(t, router, http.MethodPatch, "/notes", map[string]string{
-		"path":    "tasks-note.md",
-		"content": movedContent,
-	})
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
-	}
-
-	rec = doRequest(t, router, http.MethodGet, "/tasks", nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
-	}
-	decodeJSONBody(t, rec, &list)
-	if len(list.Tasks) != 0 {
-		t.Fatalf("expected 0 tasks, got %d", len(list.Tasks))
+	lines := strings.Split(string(data), "\n")
+	if !strings.HasPrefix(lines[0], "- [x] ") {
+		t.Fatalf("expected task to be marked complete, got %q", lines[0])
 	}
 }
 
@@ -469,86 +497,6 @@ func TestFoldersCRUD(t *testing.T) {
 	rec = doRequest(t, router, http.MethodDelete, "/folders?path=folder-b", nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)
-	}
-}
-
-func TestTasksCRUD(t *testing.T) {
-	dir, router := setupTestRouter(t)
-
-	rec := doRequest(t, router, http.MethodGet, "/tasks", nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
-	}
-	var list TaskListResponse
-	decodeJSONBody(t, rec, &list)
-	if list.Notice == "" {
-		t.Fatalf("expected notice when creating tasks.json")
-	}
-	if _, err := os.Stat(filepath.Join(dir, "tasks.json")); err != nil {
-		t.Fatalf("expected tasks.json to exist")
-	}
-
-	rec = doRequest(t, router, http.MethodPost, "/tasks", map[string]any{
-		"title":     "Task One",
-		"project":   "Project A",
-		"tags":      []string{"alpha"},
-		"duedate":   "2024-03-10",
-		"priority":  2,
-		"completed": false,
-		"notes":     "hello",
-	})
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("expected status 201, got %d", rec.Code)
-	}
-	var created Task
-	decodeJSONBody(t, rec, &created)
-	_ = created
-	if created.ID == "" {
-		t.Fatalf("expected task id to be set")
-	}
-	if created.Title != "Task One" {
-		t.Fatalf("expected title Task One, got %q", created.Title)
-	}
-
-	rec = doRequest(t, router, http.MethodGet, "/tasks/"+created.ID, nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
-	}
-	var fetched Task
-	decodeJSONBody(t, rec, &fetched)
-	if fetched.ID != created.ID {
-		t.Fatalf("expected task id %q, got %q", created.ID, fetched.ID)
-	}
-
-	rec = doRequest(t, router, http.MethodPatch, "/tasks/"+created.ID, map[string]any{
-		"title":     "Task Updated",
-		"project":   "",
-		"tags":      []string{},
-		"duedate":   "2024-03-12",
-		"priority":  5,
-		"completed": true,
-		"notes":     "updated",
-	})
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
-	}
-	var updated Task
-	decodeJSONBody(t, rec, &updated)
-	if !updated.Completed {
-		t.Fatalf("expected task to be completed")
-	}
-	if updated.Priority != 5 {
-		t.Fatalf("expected priority 5, got %d", updated.Priority)
-	}
-
-	rec = doRequest(t, router, http.MethodDelete, "/tasks/"+created.ID, nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
-	}
-
-	rec = doRequest(t, router, http.MethodGet, "/tasks/"+created.ID, nil)
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d", rec.Code)
 	}
 }
 
@@ -658,31 +606,6 @@ func TestSearchEndpoint(t *testing.T) {
 	decodeJSONBody(t, rec, &matches)
 	if len(matches) != 1 || matches[0].Path != "beta.md" || matches[0].Type != "note" {
 		t.Fatalf("expected beta.md match, got %#v", matches)
-	}
-
-	rec = doRequest(t, router, http.MethodPost, "/tasks", map[string]any{
-		"title":     "Call Mom",
-		"project":   "Home",
-		"tags":      []string{"family"},
-		"duedate":   "2024-04-01",
-		"priority":  1,
-		"completed": false,
-		"notes":     "querytask",
-	})
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("expected status 201, got %d", rec.Code)
-	}
-	var created Task
-	decodeJSONBody(t, rec, &created)
-
-	rec = doRequest(t, router, http.MethodGet, "/search?query=querytask", nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
-	}
-	matches = nil
-	decodeJSONBody(t, rec, &matches)
-	if len(matches) != 0 {
-		t.Fatalf("expected no task matches, got %#v", matches)
 	}
 }
 

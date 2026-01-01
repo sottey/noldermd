@@ -4,36 +4,46 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
 
 var (
-	taskLinePrefix = regexp.MustCompile(`^\s*\*\s+`)
-	taskProject    = regexp.MustCompile(`(^|\s)\+([A-Za-z0-9][A-Za-z0-9_-]*)\b`)
-	taskDueDate    = regexp.MustCompile(`(^|\s)>(\d{4}-\d{2}-\d{2})\b`)
-	taskPriority   = regexp.MustCompile(`(^|\s)-([1-5])\b`)
-	taskTag        = regexp.MustCompile(`(^|\s)#([A-Za-z]+)\b`)
+	todoLinePattern     = regexp.MustCompile(`^\s*-\s+\[( |x|X|✓)\]\s+`)
+	todoTogglePattern   = regexp.MustCompile(`^(\s*-\s+\[)( |x|X|✓)(\]\s+)`)
+	taskProjectPattern  = regexp.MustCompile(`(^|\s)\+([A-Za-z]+)\b`)
+	taskTagPattern      = regexp.MustCompile(`(^|\s)#([A-Za-z]+)\b`)
+	taskMentionPattern  = regexp.MustCompile(`(^|\s)@([A-Za-z]+)\b`)
+	taskDuePattern      = regexp.MustCompile(`(^|\s)>(\S+)`)
+	taskPriorityPattern = regexp.MustCompile(`(^|\s)\^([1-5])\b`)
+	taskTokenPattern    = regexp.MustCompile(`(^|\s)(#[A-Za-z]+|@[A-Za-z]+|\+[A-Za-z]+|\^[1-5]|>\S+)`)
 )
 
-type ParsedNoteTask struct {
-	LineNumber int
-	LineHash   string
-	Title      string
-	Project    string
-	DueDate    string
-	Priority   int
-	Tags       []string
+type ParsedTodo struct {
+	LineNumber   int
+	LineHash     string
+	Text         string
+	Completed    bool
+	Project      string
+	Tags         []string
+	Mentions     []string
+	DueDateRaw   string
+	DueDateISO   string
+	DueDateValid bool
+	Priority     int
 }
 
-func parseNoteTasks(content string) []ParsedNoteTask {
+func parseTodoLines(content string) []ParsedTodo {
 	lines := strings.Split(content, "\n")
-	tasks := make([]ParsedNoteTask, 0)
+	todos := make([]ParsedTodo, 0)
 	for i, line := range lines {
 		raw := strings.TrimSuffix(line, "\r")
-		loc := taskLinePrefix.FindStringIndex(raw)
+		loc := todoLinePattern.FindStringIndex(raw)
 		if loc == nil {
+			continue
+		}
+		match := todoLinePattern.FindStringSubmatch(raw)
+		if len(match) < 2 {
 			continue
 		}
 		rest := raw[loc[1]:]
@@ -41,64 +51,140 @@ func parseNoteTasks(content string) []ParsedNoteTask {
 			continue
 		}
 
-		project := ""
-		if match := taskProject.FindStringSubmatch(rest); len(match) > 0 {
-			project = match[2]
+		completed := match[1] != " "
+		project := extractFirstMatch(taskProjectPattern, rest)
+		tags := extractMatches(taskTagPattern, rest)
+		mentions := extractMatches(taskMentionPattern, rest)
+		priority := extractPriority(rest)
+		dueRaw := extractDueDate(rest)
+		dueISO, dueValid := normalizeDueDate(dueRaw)
+
+		text := cleanTaskText(rest)
+		if text == "" {
+			text = strings.TrimSpace(rest)
 		}
 
-		dueDate := ""
-		if match := taskDueDate.FindStringSubmatch(rest); len(match) > 0 {
-			if _, err := time.Parse(dueDateLayout, match[2]); err == nil {
-				dueDate = match[2]
-			}
-		}
-
-		priority := 3
-		if match := taskPriority.FindStringSubmatch(rest); len(match) > 0 {
-			if value, err := strconv.Atoi(match[2]); err == nil {
-				priority = value
-			}
-		}
-
-		tags := extractTaskTags(rest)
-		tasks = append(tasks, ParsedNoteTask{
-			LineNumber: i + 1,
-			LineHash:   hashLine(raw),
-			Title:      rest,
-			Project:    project,
-			DueDate:    dueDate,
-			Priority:   priority,
-			Tags:       tags,
+		todos = append(todos, ParsedTodo{
+			LineNumber:   i + 1,
+			LineHash:     hashLine(raw),
+			Text:         text,
+			Completed:    completed,
+			Project:      strings.ToLower(project),
+			Tags:         tags,
+			Mentions:     mentions,
+			DueDateRaw:   dueRaw,
+			DueDateISO:   dueISO,
+			DueDateValid: dueValid,
+			Priority:     priority,
 		})
 	}
-	return tasks
+	return todos
 }
 
-func extractTaskTags(text string) []string {
-	if text == "" {
-		return []string{}
+func setTaskLineCompletion(line string, completed bool) (string, bool) {
+	match := todoTogglePattern.FindStringSubmatchIndex(line)
+	if match == nil || len(match) < 6 {
+		return "", false
 	}
-	matches := taskTag.FindAllStringSubmatch(text, -1)
+	marker := " "
+	if completed {
+		marker = "x"
+	}
+	updated := line[:match[4]] + marker + line[match[5]:]
+	return updated, true
+}
+
+func extractFirstMatch(pattern *regexp.Regexp, text string) string {
+	match := pattern.FindStringSubmatch(text)
+	if len(match) < 3 {
+		return ""
+	}
+	return match[2]
+}
+
+func extractMatches(pattern *regexp.Regexp, text string) []string {
+	matches := pattern.FindAllStringSubmatch(text, -1)
 	if len(matches) == 0 {
 		return []string{}
 	}
 	seen := make(map[string]struct{})
-	tags := make([]string, 0, len(matches))
+	values := make([]string, 0, len(matches))
 	for _, match := range matches {
 		if len(match) < 3 {
 			continue
 		}
-		tag := strings.ToLower(match[2])
-		if tag == "" {
+		value := strings.ToLower(match[2])
+		if value == "" {
 			continue
 		}
-		if _, exists := seen[tag]; exists {
+		if _, ok := seen[value]; ok {
 			continue
 		}
-		seen[tag] = struct{}{}
-		tags = append(tags, tag)
+		seen[value] = struct{}{}
+		values = append(values, value)
 	}
-	return tags
+	return values
+}
+
+func extractPriority(text string) int {
+	match := taskPriorityPattern.FindStringSubmatch(text)
+	if len(match) < 3 {
+		return 0
+	}
+	switch match[2] {
+	case "1":
+		return 1
+	case "2":
+		return 2
+	case "3":
+		return 3
+	case "4":
+		return 4
+	case "5":
+		return 5
+	default:
+		return 0
+	}
+}
+
+func extractDueDate(text string) string {
+	match := taskDuePattern.FindStringSubmatch(text)
+	if len(match) < 3 {
+		return ""
+	}
+	return strings.TrimRight(match[2], ".,;:)]}")
+}
+
+func normalizeDueDate(raw string) (string, bool) {
+	if raw == "" {
+		return "", false
+	}
+	layouts := []string{
+		"2006-01-02",
+		"2006/01/02",
+		"2006.01.02",
+		"01/02/2006",
+		"02/01/2006",
+		"Jan 2 2006",
+		"January 2 2006",
+		"Jan 2, 2006",
+		"January 2, 2006",
+		time.RFC3339,
+		time.RFC3339Nano,
+	}
+	for _, layout := range layouts {
+		parsed, err := time.ParseInLocation(layout, raw, time.Local)
+		if err == nil {
+			return parsed.Format("2006-01-02"), true
+		}
+	}
+	return "", false
+}
+
+func cleanTaskText(text string) string {
+	cleaned := taskTokenPattern.ReplaceAllString(text, " ")
+	cleaned = strings.Join(strings.Fields(cleaned), " ")
+	return strings.TrimSpace(cleaned)
 }
 
 func hashLine(line string) string {

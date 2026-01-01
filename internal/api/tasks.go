@@ -1,73 +1,48 @@
 package api
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
-
-	"github.com/go-chi/chi/v5"
 )
 
-const tasksFileName = "tasks.json"
-
-const dueDateLayout = "2006-01-02"
-
-type Task struct {
-	ID        string      `json:"id"`
-	Title     string      `json:"title"`
-	Project   string      `json:"project"`
-	Tags      []string    `json:"tags"`
-	Created   time.Time   `json:"created"`
-	Updated   time.Time   `json:"updated"`
-	DueDate   string      `json:"duedate"`
-	Priority  int         `json:"priority"`
-	Completed bool        `json:"completed"`
-	Notes     string      `json:"notes"`
-	Recurring any         `json:"recurring"`
-	Source    *TaskSource `json:"source,omitempty"`
-}
-
-type TaskSource struct {
-	NotePath   string `json:"notePath"`
-	LineNumber int    `json:"lineNumber"`
-	LineHash   string `json:"lineHash"`
-}
-
-type TaskStore struct {
-	Version int    `json:"version"`
-	Tasks   []Task `json:"tasks"`
+type TaskItem struct {
+	ID         string   `json:"id"`
+	Path       string   `json:"path"`
+	LineNumber int      `json:"lineNumber"`
+	LineHash   string   `json:"lineHash"`
+	Text       string   `json:"text"`
+	Completed  bool     `json:"completed"`
+	Project    string   `json:"project"`
+	Tags       []string `json:"tags"`
+	Mentions   []string `json:"mentions"`
+	DueDate    string   `json:"dueDate,omitempty"`
+	DueDateISO string   `json:"dueDateISO,omitempty"`
+	Priority   int      `json:"priority,omitempty"`
 }
 
 type TaskListResponse struct {
-	Tasks  []Task `json:"tasks"`
-	Notice string `json:"notice,omitempty"`
+	Tasks  []TaskItem `json:"tasks"`
+	Notice string     `json:"notice,omitempty"`
 }
 
-type TaskPayload struct {
-	Title     string   `json:"title"`
-	Project   string   `json:"project"`
-	Tags      []string `json:"tags"`
-	DueDate   string   `json:"duedate"`
-	Priority  int      `json:"priority"`
-	Completed bool     `json:"completed"`
-	Notes     string   `json:"notes"`
+type TaskTogglePayload struct {
+	Path       string `json:"path"`
+	LineNumber int    `json:"lineNumber"`
+	LineHash   string `json:"lineHash"`
+	Completed  bool   `json:"completed"`
 }
 
 func (s *Server) handleTasksList(w http.ResponseWriter, r *http.Request) {
-	store, notice, err := s.loadTasks()
+	tasks, notice, err := s.listTasks()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "unable to load tasks")
 		return
 	}
 
-	resp := TaskListResponse{Tasks: store.Tasks}
+	resp := TaskListResponse{Tasks: tasks}
 	if notice != "" {
 		resp.Notice = notice
 	}
@@ -75,245 +50,160 @@ func (s *Server) handleTasksList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-func (s *Server) handleTasksGet(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimSpace(chi.URLParam(r, "id"))
-	if id == "" {
-		writeError(w, http.StatusBadRequest, "task id is required")
-		return
-	}
-
-	store, _, err := s.loadTasks()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "unable to load tasks")
-		return
-	}
-
-	for _, task := range store.Tasks {
-		if task.ID == id {
-			writeJSON(w, http.StatusOK, task)
-			return
-		}
-	}
-
-	writeError(w, http.StatusNotFound, "task not found")
-}
-
-func (s *Server) handleTasksCreate(w http.ResponseWriter, r *http.Request) {
-	payload, err := decodeJSON[TaskPayload](r.Body)
+func (s *Server) handleTasksToggle(w http.ResponseWriter, r *http.Request) {
+	payload, err := decodeJSON[TaskTogglePayload](r.Body)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if strings.TrimSpace(payload.Path) == "" {
+		writeError(w, http.StatusBadRequest, "path is required")
+		return
+	}
+	if payload.LineNumber <= 0 {
+		writeError(w, http.StatusBadRequest, "lineNumber must be positive")
+		return
+	}
 
-	payload, err = normalizeTaskPayload(payload)
+	absPath, relPath, err := s.resolvePath(payload.Path)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-
-	store, _, err := s.loadTasks()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "unable to load tasks")
+	if !isMarkdown(absPath) {
+		writeError(w, http.StatusBadRequest, "not a note file")
 		return
 	}
 
-	now := time.Now().UTC()
-	task := Task{
-		ID:        newUUID(),
-		Title:     payload.Title,
-		Project:   payload.Project,
-		Tags:      payload.Tags,
-		Created:   now,
-		Updated:   now,
-		DueDate:   payload.DueDate,
-		Priority:  payload.Priority,
-		Completed: payload.Completed,
-		Notes:     payload.Notes,
-		Recurring: nil,
-	}
-
-	store.Tasks = append(store.Tasks, task)
-	if err := s.saveTasks(store); err != nil {
-		writeError(w, http.StatusInternalServerError, "unable to save tasks")
-		return
-	}
-
-	s.logger.Info("task created", "id", task.ID, "title", task.Title, "project", task.Project)
-	writeJSON(w, http.StatusCreated, task)
-}
-
-func (s *Server) handleTasksUpdate(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimSpace(chi.URLParam(r, "id"))
-	if id == "" {
-		writeError(w, http.StatusBadRequest, "task id is required")
-		return
-	}
-
-	payload, err := decodeJSON[TaskPayload](r.Body)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	payload, err = normalizeTaskPayload(payload)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	store, _, err := s.loadTasks()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "unable to load tasks")
-		return
-	}
-
-	for i, task := range store.Tasks {
-		if task.ID != id {
-			continue
-		}
-		updated := task
-		updated.Title = payload.Title
-		updated.Project = payload.Project
-		updated.Tags = payload.Tags
-		updated.DueDate = payload.DueDate
-		updated.Priority = payload.Priority
-		updated.Completed = payload.Completed
-		updated.Notes = payload.Notes
-		updated.Updated = time.Now().UTC()
-		store.Tasks[i] = updated
-		if err := s.saveTasks(store); err != nil {
-			writeError(w, http.StatusInternalServerError, "unable to save tasks")
-			return
-		}
-		s.logger.Info("task updated", "id", updated.ID, "title", updated.Title, "project", updated.Project, "completed", updated.Completed)
-		writeJSON(w, http.StatusOK, updated)
-		return
-	}
-
-	writeError(w, http.StatusNotFound, "task not found")
-}
-
-func (s *Server) handleTasksDelete(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimSpace(chi.URLParam(r, "id"))
-	if id == "" {
-		writeError(w, http.StatusBadRequest, "task id is required")
-		return
-	}
-
-	store, _, err := s.loadTasks()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "unable to load tasks")
-		return
-	}
-
-	for i, task := range store.Tasks {
-		if task.ID != id {
-			continue
-		}
-		store.Tasks = append(store.Tasks[:i], store.Tasks[i+1:]...)
-		if err := s.saveTasks(store); err != nil {
-			writeError(w, http.StatusInternalServerError, "unable to save tasks")
-			return
-		}
-		s.logger.Info("task deleted", "id", task.ID, "title", task.Title, "project", task.Project)
-		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
-		return
-	}
-
-	writeError(w, http.StatusNotFound, "task not found")
-}
-
-func (s *Server) tasksFilePath() string {
-	return filepath.Join(s.notesDir, tasksFileName)
-}
-
-func (s *Server) loadTasks() (TaskStore, string, error) {
-	path := s.tasksFilePath()
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(absPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			store := TaskStore{Version: 1, Tasks: []Task{}}
-			if err := os.MkdirAll(s.notesDir, 0o755); err != nil {
-				return store, "", err
-			}
-			if err := s.saveTasks(store); err != nil {
-				return store, "", err
-			}
-			s.logger.Info("tasks file created", "path", path)
-			return store, "Created tasks.json", nil
+			writeError(w, http.StatusNotFound, "note not found")
+			return
 		}
-		return TaskStore{}, "", err
+		writeError(w, http.StatusInternalServerError, "unable to read note")
+		return
 	}
 
-	var store TaskStore
-	if err := json.Unmarshal(data, &store); err != nil {
-		return TaskStore{}, "", err
-	}
-	if store.Version == 0 {
-		store.Version = 1
-	}
-	if store.Tasks == nil {
-		store.Tasks = []Task{}
+	lines := strings.Split(string(data), "\n")
+	lineIndex := payload.LineNumber - 1
+	if lineIndex < 0 || lineIndex >= len(lines) || !lineHashMatches(lines[lineIndex], payload.LineHash) {
+		if payload.LineHash == "" {
+			writeError(w, http.StatusBadRequest, "task not found")
+			return
+		}
+		found := false
+		for i, line := range lines {
+			if lineHashMatches(line, payload.LineHash) {
+				lineIndex = i
+				found = true
+				break
+			}
+		}
+		if !found {
+			writeError(w, http.StatusBadRequest, "task not found")
+			return
+		}
 	}
 
-	return store, "", nil
+	originalLine := lines[lineIndex]
+	lineEnding := ""
+	if strings.HasSuffix(originalLine, "\r") {
+		lineEnding = "\r"
+		originalLine = strings.TrimSuffix(originalLine, "\r")
+	}
+
+	updatedLine, ok := setTaskLineCompletion(originalLine, payload.Completed)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "line is not a task")
+		return
+	}
+	lines[lineIndex] = updatedLine + lineEnding
+
+	updated := strings.Join(lines, "\n")
+	if err := os.WriteFile(absPath, []byte(updated), 0o644); err != nil {
+		s.logger.Error("unable to update task line", "path", relPath, "line", lineIndex+1, "error", err)
+		writeError(w, http.StatusInternalServerError, "unable to update note")
+		return
+	}
+
+	s.logger.Info("task toggled", "path", relPath, "line", lineIndex+1, "completed", payload.Completed)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 }
 
-func (s *Server) saveTasks(store TaskStore) error {
-	data, err := json.MarshalIndent(store, "", "  ")
+func (s *Server) listTasks() ([]TaskItem, string, error) {
+	var tasks []TaskItem
+	var warnings []string
+
+	err := filepath.WalkDir(s.notesDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if isIgnoredFile(d.Name()) || !isMarkdown(d.Name()) {
+			return nil
+		}
+
+		rel, err := filepath.Rel(s.notesDir, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		parsed := parseTodoLines(string(data))
+		for _, todo := range parsed {
+			task := TaskItem{
+				ID:         fmt.Sprintf("%s:%d", rel, todo.LineNumber),
+				Path:       rel,
+				LineNumber: todo.LineNumber,
+				LineHash:   todo.LineHash,
+				Text:       todo.Text,
+				Completed:  todo.Completed,
+				Project:    todo.Project,
+				Tags:       todo.Tags,
+				Mentions:   todo.Mentions,
+				DueDate:    todo.DueDateRaw,
+				DueDateISO: todo.DueDateISO,
+				Priority:   todo.Priority,
+			}
+			if todo.DueDateRaw != "" && !todo.DueDateValid {
+				warnings = append(warnings, fmt.Sprintf("%s:%d (%s)", rel, todo.LineNumber, todo.DueDateRaw))
+				s.logger.Warn("unrecognized due date", "path", rel, "line", todo.LineNumber, "value", todo.DueDateRaw)
+			}
+			tasks = append(tasks, task)
+		}
+		return nil
+	})
 	if err != nil {
-		return err
+		return nil, "", err
 	}
-	data = append(data, '\n')
-	return os.WriteFile(s.tasksFilePath(), data, 0o644)
-}
 
-func normalizeTaskPayload(payload TaskPayload) (TaskPayload, error) {
-	payload.Title = strings.TrimSpace(payload.Title)
-	if payload.Title == "" {
-		return payload, errors.New("title is required")
-	}
-	payload.Project = strings.TrimSpace(payload.Project)
-	payload.Tags = normalizeTags(payload.Tags)
-	if payload.Priority < 1 || payload.Priority > 5 {
-		return payload, errors.New("priority must be between 1 and 5")
-	}
-	if payload.DueDate != "" {
-		if _, err := time.Parse(dueDateLayout, payload.DueDate); err != nil {
-			return payload, errors.New("duedate must be YYYY-MM-DD")
+	notice := ""
+	if len(warnings) > 0 {
+		limit := warnings
+		if len(limit) > 3 {
+			limit = warnings[:3]
 		}
+		notice = fmt.Sprintf(
+			"Found %d task(s) with unrecognized due dates. Examples: %s.",
+			len(warnings),
+			strings.Join(limit, "; "),
+		)
 	}
-	return payload, nil
+
+	return tasks, notice, nil
 }
 
-func normalizeTags(tags []string) []string {
-	if len(tags) == 0 {
-		return []string{}
+func lineHashMatches(line, hash string) bool {
+	if hash == "" {
+		return false
 	}
-	clean := make([]string, 0, len(tags))
-	for _, tag := range tags {
-		trimmed := strings.TrimSpace(tag)
-		if trimmed == "" {
-			continue
-		}
-		clean = append(clean, trimmed)
-	}
-	return clean
-}
-
-func newUUID() string {
-	buf := make([]byte, 16)
-	if _, err := rand.Read(buf); err != nil {
-		return fmt.Sprintf("fallback-%d", time.Now().UnixNano())
-	}
-	buf[6] = (buf[6] & 0x0f) | 0x40
-	buf[8] = (buf[8] & 0x3f) | 0x80
-	return fmt.Sprintf(
-		"%s-%s-%s-%s-%s",
-		hex.EncodeToString(buf[0:4]),
-		hex.EncodeToString(buf[4:6]),
-		hex.EncodeToString(buf[6:8]),
-		hex.EncodeToString(buf[8:10]),
-		hex.EncodeToString(buf[10:16]),
-	)
+	raw := strings.TrimSuffix(line, "\r")
+	return hashLine(raw) == hash
 }

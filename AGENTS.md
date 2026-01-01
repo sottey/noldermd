@@ -11,8 +11,8 @@ This file documents the current project shape and interaction model.
   tags root.
 - Left sidebar shows a `Tasks` root with project groups, a "No Project" group,
   and a "Completed" group.
-- Clicking Notes/Tasks/Tags roots or any folder/project group shows a summary
-  panel in the main pane.
+- Clicking Notes/Tags roots or any folder shows a summary panel in the main pane.
+- Clicking Tasks root or any project group shows a task list in the main pane.
 - Main pane shows a Markdown editor, a rendered preview, or a split view with a
   draggable splitter.
 - Settings button in the sidebar header opens a settings form.
@@ -35,7 +35,7 @@ This file documents the current project shape and interaction model.
 ## Architecture
 - **CLI**: A Cobra-based entrypoint used to run the server and any future admin
   tasks (example: `noldermd serve --notes-dir ./Notes --port 8080`).
-- **API**: A JSON HTTP API that handles notes and folder operations.
+- **API**: A JSON HTTP API that handles notes, folders, and on-demand task parsing.
 - **Web app**: A UI that consumes the API and renders the editor + preview.
 - **Storage**: Notes live on disk in the `Notes/` tree as Markdown files.
 
@@ -46,15 +46,15 @@ This file documents the current project shape and interaction model.
 - Create/rename/delete notes.
 - Provide a refresh endpoint or tree reload operation.
 - List tags extracted from note contents.
-- Read/write tasks stored in `Notes/tasks.json`.
+- Parse tasks from note contents and toggle completion by editing note lines.
 - Read/write settings stored in `Notes/settings.json`.
 
 ## UI responsibilities
 - Render the folder tree and handle context menus.
 - Render the tags root and tag groups.
-- Render the tasks root and project groups.
+- Render the tasks root and project groups, and show task lists in the main pane.
 - Render the Markdown editor, preview, and split view with draggable splitter.
-- Render a task editor form that mirrors the note editor controls.
+- Task list rows include a checkbox toggle and open the source note on click.
 - Render a settings form with sections for Display (dark mode, default view, show templates),
   Autosave (autosave, interval), and Folders (default folder, daily folder).
 - Ensure tag labels remain legible in dark mode.
@@ -86,11 +86,8 @@ This file documents the current project shape and interaction model.
 - **Tags**:
   - `GET /api/v1/tags` returns tags with the notes that contain them.
 - **Tasks**:
-  - `GET /api/v1/tasks` returns tasks.
-  - `GET /api/v1/tasks/<id>` returns a task.
-  - `POST /api/v1/tasks` creates a task.
-  - `PATCH /api/v1/tasks/<id>` updates a task.
-  - `DELETE /api/v1/tasks/<id>` deletes a task.
+  - `GET /api/v1/tasks` returns tasks parsed from notes.
+  - `PATCH /api/v1/tasks/toggle` toggles completion for a task line.
 - **Settings**:
   - `GET /api/v1/settings` returns settings.
   - `PATCH /api/v1/settings` updates settings.
@@ -103,7 +100,9 @@ This file documents the current project shape and interaction model.
 - Only `.md` files are considered notes; other files are ignored.
 - Files starting with `._` are ignored.
 - Tags match `#` followed by letters, preceded by whitespace or start of line.
-- Tasks live in `Notes/tasks.json` and use UUIDs for ids.
+- Tasks are parsed from note lines starting with `- [ ] ` or `- [x] ` (leading whitespace ok).
+- Task markers: `#tag`, `@mention`, `+project`, `>due`, `^priority` (1-5); markers are case-insensitive and normalized to lowercase.
+- Only one project is used per task (first match wins).
 - Settings live in `Notes/settings.json`.
 - If a folder contains `default.template`, new notes created in that folder use
   the template contents.
